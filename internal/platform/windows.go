@@ -510,7 +510,8 @@ func processImagePath(pid uint32) string {
 func detectWindowsInstall() (windowsInstall, []windowsInstall) {
 	local := os.Getenv("LOCALAPPDATA")
 	appData := os.Getenv("APPDATA")
-	msixRoot := filepath.Join(local, "Packages", windowsPackageFamily, "LocalCache", "Roaming", "Claude")
+	// 当前 MSIX Desktop 将登录与 Code 索引保存在实际 Roaming 目录，LocalCache 内没有这一配置。
+	msixRoot := filepath.Join(appData, "Claude")
 	candidates := make([]windowsInstall, 0, 6)
 	if registered, ok := detectRegisteredWin32(appData); ok {
 		candidates = append(candidates, registered)
