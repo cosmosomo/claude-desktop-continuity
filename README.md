@@ -4,6 +4,8 @@ Windows 上的 Claude Desktop 账号与本地 Code 会话管理。继续使用�
 
 Windows companion for the original Claude Desktop: saved accounts, local Code transcript previews, and switch-and-continue in one window. Unofficial; not affiliated with Anthropic.
 
+2026-10-12 实测更新：A→B→A 账号恢复与原生会话登记已通过，最近对话预览内容一致，已回到原账号。测试调用主界面使用的同一接续逻辑；没有验证 Desktop 页面完整历史显示或发送模型请求。详见 [VALIDATION.md](VALIDATION.md)。
+
 ## 现在可以做什么
 
 - 复用 Desktop Switcher 的账号快照、锁、恢复及托盘添加/备份流程。

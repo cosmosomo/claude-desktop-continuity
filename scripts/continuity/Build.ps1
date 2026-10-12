@@ -26,6 +26,9 @@ try {
     if ($LASTEXITCODE -ne 0) { throw 'Continuity application build failed.' }
     & $compiler /nologo /target:exe /platform:x64 "/out:$(Join-Path $distributionRoot 'LocalIntegrationTests.exe')" "/reference:$application" /reference:System.Windows.Forms.dll /reference:System.Drawing.dll /reference:System.Web.Extensions.dll (Join-Path $repositoryRoot 'app\LocalIntegrationTests.cs')
     if ($LASTEXITCODE -ne 0) { throw 'Local integration test build failed.' }
+    # 仅编译；真实账号切换验收必须获得用户允许后单独执行，不能进入 CI 自动测试。
+    & $compiler /nologo /target:exe /platform:x64 "/out:$(Join-Path $distributionRoot 'LiveAcceptance.exe')" "/reference:$application" /reference:System.Web.Extensions.dll (Join-Path $repositoryRoot 'app\LiveAcceptance.cs')
+    if ($LASTEXITCODE -ne 0) { throw 'Live acceptance harness build failed.' }
     if ($ConfigPath) {
         & (Join-Path $distributionRoot 'LocalIntegrationTests.exe') ([IO.Path]::GetFullPath($ConfigPath))
         if ($LASTEXITCODE -ne 0) { throw 'Local integration checks failed.' }
