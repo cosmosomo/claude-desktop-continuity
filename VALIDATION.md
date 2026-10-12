@@ -1,7 +1,8 @@
 # Validation boundaries
 
-Version 0.1.0 is a Windows x64 preview. Compatibility evidence is version-specific.
+Version 0.1.1 is a Windows x64 preview. Compatibility evidence is version-specific.
 Local validation on 2026-10-12: all six Go packages passed `go test ./...`, `go vet ./...` passed, and 23 real-data/frontend integration checks passed.
+After the 12-hour default-selection update, all 25 local real-data/frontend checks passed, including recent-session eligibility and manual cancellation; Go tests and vet passed again.
 
 Validation consists of:
 
@@ -22,6 +23,10 @@ The native Desktop handoff previously succeeded with Desktop 2.31226.1.0 for reg
 At initial publication, the user chose to preserve running Desktop work and defer live acceptance. Subsequently, on 2026-10-12 the user explicitly authorized it. The live A → B → A account restore and native session-registration cycle passed, and the original account was restored with the selected session reopened. The test used the most recently modified registered real transcript, verified a different initialized account namespace, verified registration in both namespaces, and compared recent ordinary conversation content before and after adoption.
 
 The live harness invokes the same `Continuity.SwitchAndOpen` implementation used by the main window. It does not verify Desktop's visible history rendering or send inference requests; those remain separate acceptance checks. The content comparison covers the bounded recent preview, not a byte-by-byte audit of the entire history. Private logs and transcript identifiers are excluded from public evidence.
+
+Subsequent user-visible acceptance on 2026-10-12: the initial fast round trip was insufficient for the user's observation, so another one-way switch was performed and left at the second account. Process IDs from the old Desktop were replaced by a freshly launched Desktop. The user explicitly confirmed the second account, prior history and an actual test reply were normal. After the user authorized returning, Desktop was restarted to the original account and the user confirmed that the newly added test dialogue was present there. The user operated the visible conversation; no Computer Use automation was used. These confirmations establish the tested conversation flow, not an audit of every historical message.
+
+Version 0.1.1 adds default selection based on actual ordinary dialogue timestamps within the configured 12-hour window, plus saved-email account labels. Launch and explicit refresh apply the default selection; ordinary search and project filtering preserve manual changes. Local integration checks exercise selection eligibility and manual cancellation using real transcripts.
 
 `Build.ps1` compiles `dist/LiveAcceptance.exe` but never runs it automatically. After completing or stopping Desktop tasks and explicitly consenting to two Desktop restarts, run it with the absolute local configuration path. It selects the latest registered real session, switches to another usable saved account, verifies adoption, and returns to the original account. A cycle error is logged and a return is attempted before reporting failure. This harness is not included in the portable release ZIP.
 

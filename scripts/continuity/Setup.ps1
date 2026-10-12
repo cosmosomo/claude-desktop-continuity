@@ -15,7 +15,7 @@ $configuration = [ordered]@{
     desktopMode = 'official'; projectsRoot = $projectsRoot; officialDesktopRoot = $desktopRoot
     officialLogPath = $desktopLog; gatewayDesktopRoot = $null; gatewayLogPath = $null; ccSwitchSettingsPath = $null
     initialProjectPath = $null; headBytes = 262144; tailBytes = 2097152; previewBytes = 8388608
-    previewMessageCount = 12; previewCharsPerMessage = 1600; maxSessions = 200
+    previewMessageCount = 12; previewCharsPerMessage = 1600; maxSessions = 200; activeSessionHours = 12
     timeZoneId = [TimeZoneInfo]::Local.Id; importTimeoutSeconds = 45; pollIntervalMs = 500; switchTimeoutSeconds = 90
     logPath = (Join-Path $distributionRoot 'continuity.events.jsonl')
     compilerPath = (Join-Path $env:WINDIR 'Microsoft.NET\Framework64\v4.0.30319\csc.exe')

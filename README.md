@@ -4,13 +4,15 @@ Windows 上的 Claude Desktop 账号与本地 Code 会话管理。继续使用�
 
 Windows companion for the original Claude Desktop: saved accounts, local Code transcript previews, and switch-and-continue in one window. Unofficial; not affiliated with Anthropic.
 
-2026-10-12 实测更新：A→B→A 账号恢复与原生会话登记已通过，最近对话预览内容一致，已回到原账号。测试调用主界面使用的同一接续逻辑；没有验证 Desktop 页面完整历史显示或发送模型请求。详见 [VALIDATION.md](VALIDATION.md)。
+2026-10-12 可见实测更新：退出并重新打开 Desktop 后，用户确认第二账号的历史与实际回复正常；切回原账号后，新增测试对话也保留。详见 [VALIDATION.md](VALIDATION.md)。
 
 ## 现在可以做什么
 
 - 复用 Desktop Switcher 的账号快照、锁、恢复及托盘添加/备份流程。
 - 自动扫描本地 Code JSONL，按文件最近修改排序，显示最后对话时间及完整会话 ID 提示。
 - 按项目和标题/ID 搜索，勾选多个会话；预览最近用户与 Claude 的文字对话。
+- 启动/刷新时默认勾选最近 12 小时内有实际文字对话的会话；不会因后台修改文件而勾选。可手动取消或补选，搜索和项目过滤保留选择；刷新会重新应用默认规则。
+- 目标账号显示保存的邮箱；邮箱没有记录时明确提示，不把配置名称当成已核实邮箱。
 - 恢复所选官方账号后验证身份和 Code 初始化，再通过 Desktop 原生入口接续选中记录。
 - 显示扫描片段内发现的压缩时间，以及最近请求的输入 token 总量。
 - 单独导入/打开当前 Desktop 的会话；显式配置后支持 CC Switch 的 Gateway 模式。
@@ -26,6 +28,8 @@ Windows companion for the original Claude Desktop: saved accounts, local Code tr
 1. 首次在账号管理器中添加/保存账号，然后回到主窗口点刷新。
 2. 根据最后对话和预览选择正确的分支，勾选需要接续的会话。
 3. 选择目标账号，点击 **切换账号并继续选中会话**。
+
+默认活跃窗口由本机 `config.local.json` 的 `activeSessionHours` 控制，新配置为 `12`。从 0.1.0 升级且已有配置时，需要添加 `"activeSessionHours": 12`；程序不会静默猜测缺失配置。
 
 如果只想在当前账号打开记录，点击 **导入/打开选中**。运行中的任务请先完成或停止；恢复登录需要重启 Desktop。
 

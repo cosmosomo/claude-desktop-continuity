@@ -30,6 +30,7 @@ namespace ClaudeSessionImporter
         public int previewMessageCount { get; set; }
         public int previewCharsPerMessage { get; set; }
         public int maxSessions { get; set; }
+        public int activeSessionHours { get; set; }
         public string timeZoneId { get; set; }
         public int importTimeoutSeconds { get; set; }
         public int pollIntervalMs { get; set; }
@@ -66,7 +67,7 @@ namespace ClaudeSessionImporter
                 if (String.IsNullOrWhiteSpace(path) || !Path.IsPathRooted(path) || !Directory.Exists(Path.GetDirectoryName(path)))
                     throw new IOException("输出文件的父目录不存在：" + path);
             if (headBytes < 1024 || tailBytes < 1024 || headBytes > 16777216 || tailBytes > 16777216 ||
-                maxSessions < 1 || maxSessions > 2000 || importTimeoutSeconds < 1 || importTimeoutSeconds > 120 ||
+                maxSessions < 1 || maxSessions > 2000 || activeSessionHours < 1 || activeSessionHours > 168 || importTimeoutSeconds < 1 || importTimeoutSeconds > 120 ||
                 pollIntervalMs < 100 || pollIntervalMs > 5000 || switchTimeoutSeconds < 20 || switchTimeoutSeconds > 180 || previewBytes < 1024 || previewBytes > 16777216 ||
                 previewMessageCount < 1 || previewMessageCount > 100 || previewCharsPerMessage < 100 || previewCharsPerMessage > 10000)
                 throw new ArgumentException("扫描大小、会话数量或导入超时配置超出允许范围。");
@@ -533,7 +534,7 @@ namespace ClaudeSessionImporter
             layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 40)); Controls.Add(layout);
             var accountBar = new FlowLayoutPanel { Dock = DockStyle.Fill, WrapContents = false };
             accountBar.Controls.Add(new Label { Text = "目标账号", AutoSize = true, Margin = new Padding(0, 8, 8, 0) });
-            accounts.Width = 220; accounts.DropDownStyle = ComboBoxStyle.DropDownList; accounts.AccessibleName = "选择目标账号"; accountBar.Controls.Add(accounts);
+            accounts.Width = 260; accounts.DropDownStyle = ComboBoxStyle.DropDownList; accounts.AccessibleName = "选择目标账号"; accountBar.Controls.Add(accounts);
             manage.Text = "添加账号 / 备份"; manage.AutoSize = true; accountBar.Controls.Add(manage);
             mode.AutoSize = true; mode.Margin = new Padding(16, 8, 0, 0); accountBar.Controls.Add(mode); layout.Controls.Add(accountBar, 0, 0);
             var filters = new FlowLayoutPanel { Dock = DockStyle.Fill, WrapContents = false };
@@ -625,12 +626,17 @@ namespace ClaudeSessionImporter
                 if (catalog.CurrentProvider() != provider) throw new IOException("扫描期间 Desktop 模式已变化，请刷新列表。");
                 Catalog.EnsureIdentity(catalog.ResolveIdentity(provider), identity);
                 checkedSessions.Clear();
+                var selectionTime = DateTimeOffset.UtcNow;
+                foreach (var recent in sessions.Where(session => session.ConversationAt.HasValue &&
+                    session.ConversationAt.Value >= selectionTime.AddHours(-settings.activeSessionHours) && session.ConversationAt.Value <= selectionTime))
+                    checkedSessions.Add(recent.Path, recent);
                 project.Items.Clear(); project.Items.Add("所有项目");
                 foreach (var cwd in sessions.Select(item => item.Cwd).Where(cwd => !String.IsNullOrWhiteSpace(cwd)).Distinct().OrderBy(cwd => cwd)) project.Items.Add(cwd);
                 int selected = String.IsNullOrWhiteSpace(settings.initialProjectPath) ? 0 : project.Items.IndexOf(settings.initialProjectPath);
                 project.SelectedIndex = selected >= 0 ? selected : 0;
                 mode.Text = (provider == "claude-desktop-official" ? "官方订阅" : "API / Gateway") + " · 当前 " +
-                    (String.IsNullOrEmpty(accountState.current) ? identity.AccountId.Substring(0, 8) : accountState.current);
+                    (currentAccount == null ? "未匹配保存的账号" : currentAccount.Display) +
+                    " · 默认勾选最近 " + settings.activeSessionHours + " 小时对话";
             }
             catch (Exception ex) { sessions.Clear(); checkedSessions.Clear(); grid.Rows.Clear(); Failure(ex); return; }
             finally { SetBusy(false); }

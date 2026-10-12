@@ -12,6 +12,7 @@ import (
 
 type continuityAccount struct {
 	Name   string         `json:"name"`
+	Email  string         `json:"email"`
 	Health profile.Health `json:"health"`
 }
 
@@ -41,7 +42,7 @@ var cmdContinuityAccounts = &cobra.Command{
 		}
 		accounts := make([]continuityAccount, 0, len(profiles))
 		for _, meta := range profiles {
-			accounts = append(accounts, continuityAccount{Name: meta.Name, Health: store.Inspect(meta.Name).Health})
+			accounts = append(accounts, continuityAccount{Name: meta.Name, Email: meta.Email, Health: store.Inspect(meta.Name).Health})
 		}
 		return json.NewEncoder(os.Stdout).Encode(struct {
 			Current  string              `json:"current"`

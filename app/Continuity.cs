@@ -11,8 +11,9 @@ namespace ClaudeSessionImporter
     public sealed class Account
     {
         public string name { get; set; }
+        public string email { get; set; }
         public string health { get; set; }
-        public string Display { get { return name + (health == "usable" ? "" : "（需重新登录：" + health + "）"); } }
+        public string Display { get { return (String.IsNullOrWhiteSpace(email) ? name + "（邮箱未记录）" : email) + (health == "usable" ? "" : "（需重新登录：" + health + "）"); } }
     }
     public sealed class AccountState
     {

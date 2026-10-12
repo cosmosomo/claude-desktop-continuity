@@ -97,7 +97,15 @@ public static class LocalIntegrationTests
                 var grid = Field<DataGridView>(picker, "grid"); var search = Field<TextBox>(picker, "search");
                 var accounts = Field<ComboBox>(picker, "accounts"); var selected = Field<Dictionary<string, Session>>(picker, "checkedSessions");
                 Check(accounts.Items.Count == state.accounts.Count, "unified window loads saved account choices");
-                Check(grid.Rows.Count > 1 && selected.Count == 0, "automatic session scan never selects sessions for the user");
+                var selectionTime = DateTimeOffset.UtcNow;
+                Check(grid.Rows.Count > 1 && selected.Values.All(session => session.ConversationAt.HasValue &&
+                    session.ConversationAt.Value >= selectionTime.AddHours(-settings.activeSessionHours).AddSeconds(-60) && session.ConversationAt.Value <= selectionTime),
+                    "default selection uses actual recent dialogue timestamps");
+                Check(grid.Rows.Cast<DataGridViewRow>().Select(row => (Session)row.Tag).Where(session => session.ConversationAt.HasValue &&
+                    session.ConversationAt.Value >= selectionTime.AddHours(-settings.activeSessionHours).AddSeconds(60) && session.ConversationAt.Value <= selectionTime)
+                    .All(session => selected.ContainsKey(session.Path)), "default selection includes real active sessions");
+                foreach (DataGridViewRow row in grid.Rows) row.Cells["Choose"].Value = false;
+                Check(selected.Count == 0, "user can clear all automatically selected sessions");
                 search.Text = sessionWithText.Id;
                 Check(grid.Rows.Count == 1, "search identifies a real transcript");
                 WaitPreview(picker);
