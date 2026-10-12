@@ -5,12 +5,16 @@ $stageRoot = Join-Path $artifactsRoot ('package-' + (Get-Date -Format 'yyyyMMdd-
 $packageRoot = Join-Path $stageRoot 'ClaudeDesktopContinuity-windows-x64'
 if (Test-Path -LiteralPath $packageRoot) { throw "Package directory already exists: $packageRoot. Choose a clean checkout before packaging again." }
 New-Item -ItemType Directory -Path (Join-Path $packageRoot 'dist'),(Join-Path $packageRoot 'scripts\continuity'),(Join-Path $packageRoot 'licenses') -Force | Out-Null
+New-Item -ItemType Directory -Path (Join-Path $packageRoot 'docs\screenshots') -Force | Out-Null
+Copy-Item -LiteralPath (Join-Path $repositoryRoot 'docs\DESIGN.md') -Destination (Join-Path $packageRoot 'docs')
+Copy-Item -LiteralPath (Join-Path $repositoryRoot 'docs\screenshots\workspace.png') -Destination (Join-Path $packageRoot 'docs\screenshots')
 foreach ($name in @('ClaudeDesktopContinuity.exe','switcher-cli.exe','switcher-tray.exe','first-run-guide.bmp')) {
     Copy-Item -LiteralPath (Join-Path $repositoryRoot "dist\$name") -Destination (Join-Path $packageRoot 'dist')
 }
 foreach ($name in @('Start.cmd','Start.ps1','README.md','LICENSE','THIRD_PARTY.md','SECURITY.md','VALIDATION.md')) {
     Copy-Item -LiteralPath (Join-Path $repositoryRoot $name) -Destination $packageRoot
 }
+Copy-Item -LiteralPath (Join-Path $repositoryRoot 'dist\Continuity.exe') -Destination $packageRoot
 Copy-Item -LiteralPath (Join-Path $repositoryRoot 'scripts\continuity\Setup.ps1') -Destination (Join-Path $packageRoot 'scripts\continuity')
 Push-Location $repositoryRoot
 try {
@@ -36,6 +40,6 @@ try {
     if ($LASTEXITCODE -ne 0) { throw 'Cannot locate Go runtime license.' }
     Copy-Item -LiteralPath (Join-Path $goRoot 'LICENSE') -Destination (Join-Path $packageRoot 'licenses\Go-runtime-LICENSE')
 } finally { Pop-Location }
-$archive = Join-Path $artifactsRoot 'ClaudeDesktopContinuity-v0.1.1-windows-x64.zip'
+$archive = Join-Path $artifactsRoot 'ClaudeDesktopContinuity-v0.2.0-windows-x64.zip'
 Compress-Archive -LiteralPath $packageRoot -DestinationPath $archive -Force
 Get-FileHash -LiteralPath $archive -Algorithm SHA256 | Format-List

@@ -4,6 +4,12 @@ Windows 上的 Claude Desktop 账号与本地 Code 会话管理。继续使用�
 
 Windows companion for the original Claude Desktop: saved accounts, local Code transcript previews, and switch-and-continue in one window. Unofficial; not affiliated with Anthropic.
 
+**当前是桌面预览版，尚非成熟安装产品。** 提供原生三栏 GUI 和直接双击的 EXE 启动入口；账号添加/备份仍使用附带的上游管理器，安装器和签名尚未提供。
+
+![实际应用截图，敏感区域已隐藏](docs/screenshots/workspace.png)
+
+截图来自真实程序与本机会话，公开版已隐藏邮箱、项目路径、会话标题和聊天内容。设计与未完成部分见 [DESIGN.md](docs/DESIGN.md)。
+
 2026-10-12 可见实测更新：退出并重新打开 Desktop 后，用户确认第二账号的历史与实际回复正常；切回原账号后，新增测试对话也保留。详见 [VALIDATION.md](VALIDATION.md)。
 
 ## 现在可以做什么
@@ -23,7 +29,7 @@ Windows companion for the original Claude Desktop: saved accounts, local Code tr
 
 从本仓库 Releases 下载 Windows x64 ZIP，解压到一个固定目录。先在原生 Claude Desktop 登录并打开 Code。
 
-双击 `Start.cmd`。首次启动会检查依赖、生成仅供本机使用的 `config.local.json`，并创建桌面 **Claude账号与会话** 快捷方式。之后直接使用该快捷方式。
+双击解压目录中的 **`Continuity.exe`**。无需终端或启动参数。首次启动会检查依赖、生成仅供本机使用的 `config.local.json`，并创建桌面 **Claude账号与会话** 快捷方式。之后直接使用该快捷方式。`Start.cmd` 保留为兼容入口。
 
 1. 首次在账号管理器中添加/保存账号，然后回到主窗口点刷新。
 2. 根据最后对话和预览选择正确的分支，勾选需要接续的会话。

@@ -35,9 +35,9 @@ if (Test-Path -LiteralPath $ccSwitchPath) {
 [IO.File]::WriteAllText($configurationPath, ($configuration | ConvertTo-Json), [Text.UTF8Encoding]::new($false))
 $shell = New-Object -ComObject WScript.Shell
 $shortcut = $shell.CreateShortcut($shortcutPath)
-$shortcut.TargetPath = Join-Path $distributionRoot 'ClaudeDesktopContinuity.exe'
-$shortcut.Arguments = '"' + $configurationPath + '"'
-$shortcut.WorkingDirectory = $distributionRoot
+$shortcut.TargetPath = Join-Path $repositoryRoot 'Continuity.exe'
+$shortcut.Arguments = ''
+$shortcut.WorkingDirectory = $repositoryRoot
 $shortcut.Description = '选择会话、预览对话、切换账号并继续原生 Claude Desktop'
 $shortcut.Save()
 Write-Output "Created: $shortcutPath"

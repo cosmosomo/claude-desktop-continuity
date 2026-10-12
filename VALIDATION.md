@@ -1,6 +1,6 @@
 # Validation boundaries
 
-Version 0.1.1 is a Windows x64 preview. Compatibility evidence is version-specific.
+Version 0.2.0 is a Windows x64 preview. Compatibility evidence is version-specific.
 Local validation on 2026-10-12: all six Go packages passed `go test ./...`, `go vet ./...` passed, and 23 real-data/frontend integration checks passed.
 After the 12-hour default-selection update, all 25 local real-data/frontend checks passed, including recent-session eligibility and manual cancellation; Go tests and vet passed again.
 
@@ -27,6 +27,8 @@ The live harness invokes the same `Continuity.SwitchAndOpen` implementation used
 Subsequent user-visible acceptance on 2026-10-12: the initial fast round trip was insufficient for the user's observation, so another one-way switch was performed and left at the second account. Process IDs from the old Desktop were replaced by a freshly launched Desktop. The user explicitly confirmed the second account, prior history and an actual test reply were normal. After the user authorized returning, Desktop was restarted to the original account and the user confirmed that the newly added test dialogue was present there. The user operated the visible conversation; no Computer Use automation was used. These confirmations establish the tested conversation flow, not an audit of every historical message.
 
 Version 0.1.1 adds default selection based on actual ordinary dialogue timestamps within the configured 12-hour window, plus saved-email account labels. Launch and explicit refresh apply the default selection; ordinary search and project filtering preserve manual changes. Local integration checks exercise selection eligibility and manual cancellation using real transcripts.
+
+Desktop workspace revision: three-column native layout and a root double-click launcher added. The same 25 real-data/frontend integration checks passed after the layout change. `RenderWorkspace` renders actual native controls and uses RichEdit's own print interface for conversation text; public exports redact sensitive display fields. This is application rendering, not capture of the user's desktop. Launcher compilation and actual launch with existing local config are separate checks; live account switching is not repeated for visual work.
 
 `Build.ps1` compiles `dist/LiveAcceptance.exe` but never runs it automatically. After completing or stopping Desktop tasks and explicitly consenting to two Desktop restarts, run it with the absolute local configuration path. It selects the latest registered real session, switches to another usable saved account, verifies adoption, and returns to the original account. A cycle error is logged and a return is attempted before reporting failure. This harness is not included in the portable release ZIP.
 

@@ -490,7 +490,7 @@ namespace ClaudeSessionImporter
         }
     }
 
-    public sealed class Picker : Form
+    public sealed partial class Picker : Form
     {
         private readonly Settings settings;
         private readonly Catalog catalog;
@@ -520,48 +520,13 @@ namespace ClaudeSessionImporter
         private CancellationTokenSource previewCancellation;
         private Task previewTask = Task.FromResult(0);
 
-        public Picker(Settings settings, bool interactiveErrors = true)
+        public Picker(Settings settings, bool interactiveErrors = true, bool automaticLoad = true)
         {
             this.interactiveErrors = interactiveErrors;
             this.settings = settings; log = new EventLog(settings.logPath); catalog = new Catalog(settings, log);
             continuity = new Continuity(settings, log, catalog);
             zone = TimeZoneInfo.FindSystemTimeZoneById(settings.timeZoneId);
-            Text = "Claude Desktop Continuity · 账号与会话"; Font = new Font("Microsoft YaHei UI", 10); Size = new Size(1300, 850);
-            MinimumSize = new Size(1000, 650); StartPosition = FormStartPosition.CenterScreen;
-            var layout = new TableLayoutPanel { Dock = DockStyle.Fill, RowCount = 5, ColumnCount = 1, Padding = new Padding(16) };
-            layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 42)); layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 46));
-            layout.RowStyles.Add(new RowStyle(SizeType.Percent, 100)); layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 36));
-            layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 40)); Controls.Add(layout);
-            var accountBar = new FlowLayoutPanel { Dock = DockStyle.Fill, WrapContents = false };
-            accountBar.Controls.Add(new Label { Text = "目标账号", AutoSize = true, Margin = new Padding(0, 8, 8, 0) });
-            accounts.Width = 260; accounts.DropDownStyle = ComboBoxStyle.DropDownList; accounts.AccessibleName = "选择目标账号"; accountBar.Controls.Add(accounts);
-            manage.Text = "添加账号 / 备份"; manage.AutoSize = true; accountBar.Controls.Add(manage);
-            mode.AutoSize = true; mode.Margin = new Padding(16, 8, 0, 0); accountBar.Controls.Add(mode); layout.Controls.Add(accountBar, 0, 0);
-            var filters = new FlowLayoutPanel { Dock = DockStyle.Fill, WrapContents = false };
-            filters.Controls.Add(new Label { Text = "项目", AutoSize = true, Margin = new Padding(0, 8, 8, 0) });
-            project.Width = 490; project.DropDownStyle = ComboBoxStyle.DropDownList; filters.Controls.Add(project);
-            filters.Controls.Add(new Label { Text = "搜索", AutoSize = true, Margin = new Padding(18, 8, 8, 0) });
-            search.Width = 230; search.AccessibleName = "搜索会话"; filters.Controls.Add(search);
-            refresh.Text = "刷新列表"; refresh.AutoSize = true; filters.Controls.Add(refresh); layout.Controls.Add(filters, 0, 1);
-            grid.Dock = DockStyle.Fill; grid.AllowUserToAddRows = false; grid.AllowUserToDeleteRows = false;
-            grid.RowHeadersVisible = false; grid.SelectionMode = DataGridViewSelectionMode.FullRowSelect; grid.MultiSelect = false;
-            grid.BackgroundColor = Color.White; grid.AutoSizeRowsMode = DataGridViewAutoSizeRowsMode.None; grid.RowTemplate.Height = 32;
-            grid.Columns.Add(new DataGridViewCheckBoxColumn { Name = "Choose", HeaderText = "选择", Width = 50, SortMode = DataGridViewColumnSortMode.NotSortable });
-            AddColumn("Title", "会话标题", 350); AddColumn("Modified", "最近修改", 145); AddColumn("Conversation", "最后对话", 145);
-            AddColumn("Registered", "当前 Desktop", 135); AddColumn("Id", "会话 ID", 105);
-            AddColumn("Input", "最近请求输入", 120);
-            grid.Columns["Title"].AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill;
-            grid.AccessibleName = "本地会话列表";
-            var content = new SplitContainer { Dock = DockStyle.Fill, Orientation = Orientation.Horizontal, Size = new Size(1160, 570),
-                SplitterDistance = 260, SplitterWidth = 7, Panel1MinSize = 140, Panel2MinSize = 140 };
-            content.Panel1.Controls.Add(grid); layout.Controls.Add(content, 0, 2);
-            var previewLayout = new TableLayoutPanel { Dock = DockStyle.Fill, RowCount = 2, ColumnCount = 1 };
-            previewLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 38)); previewLayout.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
-            previewHeading.Dock = DockStyle.Fill; previewHeading.TextAlign = ContentAlignment.MiddleLeft; previewHeading.AutoEllipsis = true;
-            previewHeading.Text = "点选会话查看最近对话；勾选用于导入。"; previewLayout.Controls.Add(previewHeading, 0, 0);
-            preview.Dock = DockStyle.Fill; preview.ReadOnly = true; preview.DetectUrls = false; preview.WordWrap = true;
-            preview.BackColor = Color.White; preview.ScrollBars = RichTextBoxScrollBars.Vertical; preview.AccessibleName = "最近对话预览";
-            previewLayout.Controls.Add(preview, 0, 1); content.Panel2.Controls.Add(previewLayout);
+            BuildLayout();
             // SelectionChanged 发生时 CurrentCell 仍可能是上一行，等当前单元格更新后再读预览。
             grid.CurrentCellChanged += delegate { if (!rendering && !busy) StartPreview(); };
             grid.CurrentCellDirtyStateChanged += delegate { if (grid.IsCurrentCellDirty) grid.CommitEdit(DataGridViewDataErrorContexts.Commit); };
@@ -574,19 +539,13 @@ namespace ClaudeSessionImporter
                 else checkedSessions.Remove(session.Path);
                 UpdateSelection();
             };
-            status.Dock = DockStyle.Fill; status.TextAlign = ContentAlignment.MiddleLeft; layout.Controls.Add(status, 0, 3);
-            var footer = new FlowLayoutPanel { Dock = DockStyle.Fill, WrapContents = false };
-            open.Text = "导入/打开选中"; open.AutoSize = true; open.AccessibleName = "导入或打开选中会话"; footer.Controls.Add(open);
-            switchOpen.Text = "切换账号并继续选中会话"; switchOpen.AutoSize = true; footer.Controls.Add(switchOpen);
-            footer.Controls.Add(new Label { Text = "保持原始记录；账号切换只支持官方 Desktop。", AutoSize = true, Margin = new Padding(14, 8, 0, 0) });
-            layout.Controls.Add(footer, 0, 4);
             refresh.Click += async delegate { await Reload(); };
             project.SelectedIndexChanged += delegate { if (!busy) Render(); };
             search.TextChanged += delegate { if (!busy) Render(); };
             open.Click += async delegate { await Import(); };
             switchOpen.Click += async delegate { await SwitchAndContinue(); };
             manage.Click += delegate { try { continuity.OpenAccountManager(); } catch (Exception ex) { Failure(ex); } };
-            Shown += async delegate { await Reload(); };
+            if (automaticLoad) Shown += async delegate { await Reload(); };
             FormClosing += delegate(object sender, FormClosingEventArgs args) { if (busy) { args.Cancel = true; status.Text = "操作正在进行，请等待完成或错误提示。"; } };
             FormClosed += delegate { previewVersion++; if (previewCancellation != null) { previewCancellation.Cancel(); previewCancellation.Dispose(); } };
         }
