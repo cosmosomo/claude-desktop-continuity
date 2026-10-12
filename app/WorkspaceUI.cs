@@ -6,90 +6,406 @@ namespace ClaudeSessionImporter
 {
     public sealed partial class Picker
     {
-        private static readonly Color Ink = Color.FromArgb(32, 48, 46);
-        private static readonly Color Paper = Color.FromArgb(247, 246, 242);
-        private static readonly Color Accent = Color.FromArgb(37, 106, 84);
-        private static readonly Color Muted = Color.FromArgb(111, 121, 115);
+        // 视觉色彩系统（Dark Pine + Warm Paper + Emerald Accent）
+        private static readonly Color PineDeep = Color.FromArgb(26, 44, 41);
+        private static readonly Color PineCard = Color.FromArgb(36, 59, 55);
+        private static readonly Color PineText = Color.FromArgb(240, 245, 242);
+        private static readonly Color PineMuted = Color.FromArgb(152, 173, 162);
+        private static readonly Color PaperBg = Color.FromArgb(248, 247, 244);
+        private static readonly Color CardBg = Color.White;
+        private static readonly Color Ink = Color.FromArgb(31, 45, 42);
+        private static readonly Color Muted = Color.FromArgb(104, 119, 112);
+        private static readonly Color AccentPrimary = Color.FromArgb(40, 125, 93);
+        private static readonly Color AccentHover = Color.FromArgb(49, 149, 111);
+        private static readonly Color BorderColor = Color.FromArgb(220, 226, 220);
+        private static readonly Color RowSelectColor = Color.FromArgb(229, 242, 233);
+
         private Label LabelAt(string text, float size, Color color, FontStyle weight)
         {
-            return new Label { Text = text, Font = new Font("Microsoft YaHei UI", size, weight), ForeColor = color,
-                Dock = DockStyle.Fill, TextAlign = ContentAlignment.MiddleLeft, AutoEllipsis = true, Margin = new Padding(0) };
+            return new Label
+            {
+                Text = text,
+                Font = new Font("Microsoft YaHei UI", size, weight),
+                ForeColor = color,
+                Dock = DockStyle.Fill,
+                TextAlign = ContentAlignment.MiddleLeft,
+                AutoEllipsis = true,
+                Margin = new Padding(0)
+            };
         }
+
         private void StyleButton(Button button, string text, bool primary)
         {
-            button.Text = text; button.FlatStyle = FlatStyle.Flat; button.FlatAppearance.BorderSize = primary ? 0 : 1;
-            button.FlatAppearance.BorderColor = Color.FromArgb(206, 214, 208);
-            button.BackColor = primary ? Accent : Color.White; button.ForeColor = primary ? Color.White : Ink;
-            button.Font = new Font(Font.FontFamily, 10, FontStyle.Bold); button.Dock = DockStyle.Fill;
-            button.Margin = new Padding(0, 4, 0, 4); button.Cursor = Cursors.Hand;
+            button.Text = text;
+            button.FlatStyle = FlatStyle.Flat;
+            button.FlatAppearance.BorderSize = primary ? 0 : 1;
+            button.FlatAppearance.BorderColor = primary ? AccentPrimary : Color.FromArgb(88, 118, 110);
+            button.BackColor = primary ? AccentPrimary : PineCard;
+            button.ForeColor = primary ? Color.White : PineText;
+            button.Font = new Font("Microsoft YaHei UI", 10, FontStyle.Bold);
+            button.Dock = DockStyle.Fill;
+            button.Margin = new Padding(0, 4, 0, 4);
+            button.Cursor = Cursors.Hand;
+            button.MouseEnter += delegate
+            {
+                if (button.Enabled)
+                {
+                    button.BackColor = primary ? AccentHover : Color.FromArgb(48, 77, 72);
+                }
+            };
+            button.MouseLeave += delegate
+            {
+                if (button.Enabled)
+                {
+                    button.BackColor = primary ? AccentPrimary : PineCard;
+                }
+            };
         }
+
         private void BuildLayout()
         {
-            SuspendLayout(); Text = "Continuity · Claude 账号与会话";
-            Font = new Font("Microsoft YaHei UI", 9); Size = new Size(1500, 900); MinimumSize = new Size(1200, 760);
-            BackColor = Paper; ForeColor = Ink; StartPosition = FormStartPosition.CenterScreen;
-            var root = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 2, RowCount = 1, Margin = new Padding(0) };
-            root.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 278)); root.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100)); Controls.Add(root);
-            var sidebar = new TableLayoutPanel { Dock = DockStyle.Fill, BackColor = Ink, Padding = new Padding(26, 28, 26, 24), ColumnCount = 1, RowCount = 14 };
-            int[] heights = { 24, 52, 46, 32, 28, 46, 66, 40, 58, 52, 16, 52, 20 };
-            foreach (int height in heights) sidebar.RowStyles.Add(new RowStyle(SizeType.Absolute, height)); sidebar.RowStyles.Add(new RowStyle(SizeType.Percent, 100)); root.Controls.Add(sidebar, 0, 0);
-            sidebar.Controls.Add(LabelAt("LOCAL WORKSPACE", 8, Color.FromArgb(165, 187, 176), FontStyle.Bold), 0, 0);
-            sidebar.Controls.Add(LabelAt("Continuity", 26, Color.White, FontStyle.Bold), 0, 1);
-            sidebar.Controls.Add(LabelAt("换个账号，继续手里的工作。", 10, Color.FromArgb(208, 219, 212), FontStyle.Regular), 0, 2);
-            sidebar.Controls.Add(LabelAt("接续到", 10, Color.White, FontStyle.Bold), 0, 4);
-            accounts.DropDownStyle = ComboBoxStyle.DropDownList; accounts.Dock = DockStyle.Fill;
-            accounts.AccessibleName = "选择目标账号"; accounts.Margin = new Padding(0, 6, 0, 0); sidebar.Controls.Add(accounts, 0, 5);
-            mode.ForeColor = Color.FromArgb(187, 207, 196); mode.Dock = DockStyle.Fill; mode.AutoEllipsis = true; mode.Padding = new Padding(0, 12, 0, 0); sidebar.Controls.Add(mode, 0, 6);
-            sidebar.Controls.Add(LabelAt("01  选择账号\n02  勾选会话\n03  继续工作", 10, Color.FromArgb(208, 219, 212), FontStyle.Regular), 0, 8);
-            StyleButton(switchOpen, "切换账号并接续  →", true); sidebar.Controls.Add(switchOpen, 0, 9);
-            StyleButton(open, "在当前账号打开", false); open.AccessibleName = "导入或打开选中会话"; sidebar.Controls.Add(open, 0, 11);
-            var lower = new TableLayoutPanel { Dock = DockStyle.Bottom, Height = 120, RowCount = 3 };
-            lower.RowStyles.Add(new RowStyle(SizeType.Absolute, 44)); lower.RowStyles.Add(new RowStyle(SizeType.Absolute, 34)); lower.RowStyles.Add(new RowStyle(SizeType.Absolute, 42));
-            StyleButton(manage, "添加账号 / 备份…", false); lower.Controls.Add(manage, 0, 0);
-            lower.Controls.Add(LabelAt("通过附带的账号管理器完成", 8, Color.FromArgb(165, 187, 176), FontStyle.Regular), 0, 1);
-            lower.Controls.Add(LabelAt("切换会重启 Claude Desktop。\n请先完成正在运行的任务。", 8, Color.FromArgb(165, 187, 176), FontStyle.Regular), 0, 2); sidebar.Controls.Add(lower, 0, 13);
-            var workspace = new TableLayoutPanel { Dock = DockStyle.Fill, Padding = new Padding(28, 24, 28, 18), RowCount = 4, ColumnCount = 1 };
-            workspace.RowStyles.Add(new RowStyle(SizeType.Absolute, 108)); workspace.RowStyles.Add(new RowStyle(SizeType.Absolute, 68));
-            workspace.RowStyles.Add(new RowStyle(SizeType.Percent, 100)); workspace.RowStyles.Add(new RowStyle(SizeType.Absolute, 50)); root.Controls.Add(workspace, 1, 0);
-            var header = new TableLayoutPanel { Dock = DockStyle.Fill, RowCount = 3 };
-            header.RowStyles.Add(new RowStyle(SizeType.Absolute, 24)); header.RowStyles.Add(new RowStyle(SizeType.Absolute, 48)); header.RowStyles.Add(new RowStyle(SizeType.Absolute, 30));
-            header.Controls.Add(LabelAt("SESSION LIBRARY  /  本地会话", 9, Accent, FontStyle.Bold), 0, 0);
-            header.Controls.Add(LabelAt("从上次停下的地方继续", 23, Ink, FontStyle.Bold), 0, 1);
-            header.Controls.Add(LabelAt("最近 " + settings.activeSessionHours + " 小时有对话的会话已默认勾选。点选一行，先看看聊到了哪里。", 10, Muted, FontStyle.Regular), 0, 2); workspace.Controls.Add(header, 0, 0);
-            var filters = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 3, RowCount = 2, Padding = new Padding(0, 0, 0, 12) };
-            filters.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 55)); filters.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 45)); filters.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 100));
-            filters.RowStyles.Add(new RowStyle(SizeType.Absolute, 22)); filters.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
-            filters.Controls.Add(LabelAt("项目", 9, Muted, FontStyle.Regular), 0, 0); filters.Controls.Add(LabelAt("搜索标题或会话 ID", 9, Muted, FontStyle.Regular), 1, 0);
-            project.DropDownStyle = ComboBoxStyle.DropDownList; project.Dock = DockStyle.Fill; project.Margin = new Padding(0, 0, 14, 0); filters.Controls.Add(project, 0, 1);
-            search.Dock = DockStyle.Fill; search.AccessibleName = "搜索会话"; search.Margin = new Padding(0, 0, 14, 0); filters.Controls.Add(search, 1, 1);
-            StyleButton(refresh, "刷新", false); refresh.Margin = new Padding(0); filters.Controls.Add(refresh, 2, 1); workspace.Controls.Add(filters, 0, 1);
-            var content = new SplitContainer { Dock = DockStyle.Fill, Orientation = Orientation.Vertical, Size = new Size(1120, 600),
-                SplitterDistance = 675, SplitterWidth = 18, Panel1MinSize = 410, Panel2MinSize = 285, BackColor = Paper };
+            SuspendLayout();
+            Text = "Continuity · Claude 账号与会话接续";
+            Font = new Font("Microsoft YaHei UI", 9F);
+            Size = new Size(1520, 920);
+            MinimumSize = new Size(1220, 780);
+            BackColor = PaperBg;
+            ForeColor = Ink;
+            StartPosition = FormStartPosition.CenterScreen;
+
+            // 根网格布局：左侧边栏 (290px) + 右工作区 (自适应)
+            var root = new TableLayoutPanel
+            {
+                Dock = DockStyle.Fill,
+                ColumnCount = 2,
+                RowCount = 1,
+                Margin = new Padding(0),
+                BackColor = PaperBg
+            };
+            root.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 290F));
+            root.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100F));
+            Controls.Add(root);
+
+            // ==================== 1. 侧边栏容器 ====================
+            var sidebar = new Panel
+            {
+                Dock = DockStyle.Fill,
+                BackColor = PineDeep,
+                Padding = new Padding(24, 28, 24, 24),
+                Margin = new Padding(0)
+            };
+            root.Controls.Add(sidebar, 0, 0);
+
+            var sidebarLayout = new TableLayoutPanel
+            {
+                Dock = DockStyle.Fill,
+                BackColor = Color.Transparent,
+                ColumnCount = 1,
+                RowCount = 5,
+                Margin = new Padding(0)
+            };
+            // 品牌头(96px), 账号操作卡片(220px), 步骤提示(90px), 弹性空间(100%), 底部操作(140px)
+            sidebarLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 96F));
+            sidebarLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 220F));
+            sidebarLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 90F));
+            sidebarLayout.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
+            sidebarLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 140F));
+            sidebar.Controls.Add(sidebarLayout);
+
+            // 1.1 品牌头
+            var brandBox = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 3, Margin = new Padding(0) };
+            brandBox.RowStyles.Add(new RowStyle(SizeType.Absolute, 20F));
+            brandBox.RowStyles.Add(new RowStyle(SizeType.Absolute, 46F));
+            brandBox.RowStyles.Add(new RowStyle(SizeType.Absolute, 26F));
+            brandBox.Controls.Add(LabelAt("CLAUDE CONTINUITY", 8F, PineMuted, FontStyle.Bold), 0, 0);
+            brandBox.Controls.Add(LabelAt("Continuity", 26F, Color.White, FontStyle.Bold), 0, 1);
+            brandBox.Controls.Add(LabelAt("换个账号，无缝继续手头工作。", 9.5F, Color.FromArgb(200, 215, 207), FontStyle.Regular), 0, 2);
+            sidebarLayout.Controls.Add(brandBox, 0, 0);
+
+            // 1.2 目标账号与核心动作卡片
+            var actionCard = new TableLayoutPanel
+            {
+                Dock = DockStyle.Fill,
+                ColumnCount = 1,
+                RowCount = 5,
+                Margin = new Padding(0, 8, 0, 8),
+                Padding = new Padding(0)
+            };
+            actionCard.RowStyles.Add(new RowStyle(SizeType.Absolute, 24F));
+            actionCard.RowStyles.Add(new RowStyle(SizeType.Absolute, 34F));
+            actionCard.RowStyles.Add(new RowStyle(SizeType.Absolute, 48F));
+            actionCard.RowStyles.Add(new RowStyle(SizeType.Absolute, 50F));
+            actionCard.RowStyles.Add(new RowStyle(SizeType.Absolute, 44F));
+
+            actionCard.Controls.Add(LabelAt("目标账号", 9.5F, PineText, FontStyle.Bold), 0, 0);
+
+            accounts.DropDownStyle = ComboBoxStyle.DropDownList;
+            accounts.Dock = DockStyle.Fill;
+            accounts.AccessibleName = "选择目标账号";
+            accounts.Font = new Font("Microsoft YaHei UI", 9.5F);
+            accounts.Margin = new Padding(0, 2, 0, 6);
+            actionCard.Controls.Add(accounts, 0, 1);
+
+            mode.ForeColor = PineMuted;
+            mode.Dock = DockStyle.Fill;
+            mode.AutoEllipsis = true;
+            mode.Font = new Font("Microsoft YaHei UI", 8.5F);
+            mode.Padding = new Padding(0, 4, 0, 6);
+            actionCard.Controls.Add(mode, 0, 2);
+
+            StyleButton(switchOpen, "切换账号并接续  →", true);
+            actionCard.Controls.Add(switchOpen, 0, 3);
+
+            StyleButton(open, "在当前账号打开", false);
+            open.AccessibleName = "导入或打开选中会话";
+            actionCard.Controls.Add(open, 0, 4);
+
+            sidebarLayout.Controls.Add(actionCard, 0, 1);
+
+            // 1.3 流程引导卡片
+            var guideBox = new Panel
+            {
+                Dock = DockStyle.Fill,
+                BackColor = PineCard,
+                Padding = new Padding(14, 12, 14, 12),
+                Margin = new Padding(0, 6, 0, 6)
+            };
+            var guideLabel = LabelAt("01 选择账号\n02 勾选要保留的会话\n03 一键接续至 Desktop", 9F, Color.FromArgb(210, 225, 218), FontStyle.Regular);
+            guideLabel.Dock = DockStyle.Fill;
+            guideBox.Controls.Add(guideLabel);
+            sidebarLayout.Controls.Add(guideBox, 0, 2);
+
+            // 1.4 底部管理与提示区
+            var lowerBox = new TableLayoutPanel
+            {
+                Dock = DockStyle.Fill,
+                ColumnCount = 1,
+                RowCount = 3,
+                Margin = new Padding(0)
+            };
+            lowerBox.RowStyles.Add(new RowStyle(SizeType.Absolute, 42F));
+            lowerBox.RowStyles.Add(new RowStyle(SizeType.Absolute, 28F));
+            lowerBox.RowStyles.Add(new RowStyle(SizeType.Absolute, 52F));
+
+            StyleButton(manage, "添加账号 / 备份…", false);
+            lowerBox.Controls.Add(manage, 0, 0);
+
+            lowerBox.Controls.Add(LabelAt("通过附带账号管理器管理凭据", 8F, PineMuted, FontStyle.Regular), 0, 1);
+            lowerBox.Controls.Add(LabelAt("切换会自动重启 Claude Desktop。\n请先完成正在进行的生成或任务。", 8F, PineMuted, FontStyle.Regular), 0, 2);
+
+            sidebarLayout.Controls.Add(lowerBox, 0, 4);
+
+            // ==================== 2. 主工作区 ====================
+            var workspace = new TableLayoutPanel
+            {
+                Dock = DockStyle.Fill,
+                Padding = new Padding(32, 26, 32, 20),
+                RowCount = 4,
+                ColumnCount = 1,
+                BackColor = PaperBg,
+                Margin = new Padding(0)
+            };
+            workspace.RowStyles.Add(new RowStyle(SizeType.Absolute, 92F));
+            workspace.RowStyles.Add(new RowStyle(SizeType.Absolute, 62F));
+            workspace.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
+            workspace.RowStyles.Add(new RowStyle(SizeType.Absolute, 42F));
+            root.Controls.Add(workspace, 1, 0);
+
+            // 2.1 顶部大标题与说明
+            var header = new TableLayoutPanel
+            {
+                Dock = DockStyle.Fill,
+                RowCount = 3,
+                ColumnCount = 1,
+                Margin = new Padding(0)
+            };
+            header.RowStyles.Add(new RowStyle(SizeType.Absolute, 22F));
+            header.RowStyles.Add(new RowStyle(SizeType.Absolute, 44F));
+            header.RowStyles.Add(new RowStyle(SizeType.Absolute, 24F));
+            header.Controls.Add(LabelAt("SESSION CONTINUITY LIBRARY  /  本地会话工作区", 9F, AccentPrimary, FontStyle.Bold), 0, 0);
+            header.Controls.Add(LabelAt("从上次停下的地方继续", 22F, Ink, FontStyle.Bold), 0, 1);
+            header.Controls.Add(LabelAt("最近 " + settings.activeSessionHours + " 小时内有新对话的会话已预先勾选。点击任意行，可在右侧查阅历史记录。", 9.5F, Muted, FontStyle.Regular), 0, 2);
+            workspace.Controls.Add(header, 0, 0);
+
+            // 2.2 筛选栏
+            var filters = new TableLayoutPanel
+            {
+                Dock = DockStyle.Fill,
+                ColumnCount = 3,
+                RowCount = 2,
+                Padding = new Padding(0, 0, 0, 8),
+                Margin = new Padding(0)
+            };
+            filters.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 260F));
+            filters.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100F));
+            filters.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 96F));
+            filters.RowStyles.Add(new RowStyle(SizeType.Absolute, 20F));
+            filters.RowStyles.Add(new RowStyle(SizeType.Absolute, 34F));
+
+            filters.Controls.Add(LabelAt("项目目录", 9F, Muted, FontStyle.Bold), 0, 0);
+            filters.Controls.Add(LabelAt("搜索会话标题、ID 或项目名称", 9F, Muted, FontStyle.Bold), 1, 0);
+
+            project.DropDownStyle = ComboBoxStyle.DropDownList;
+            project.Dock = DockStyle.Fill;
+            project.Font = new Font("Microsoft YaHei UI", 9.5F);
+            project.Margin = new Padding(0, 0, 16, 0);
+            filters.Controls.Add(project, 0, 1);
+
+            search.Dock = DockStyle.Fill;
+            search.AccessibleName = "搜索会话";
+            search.Font = new Font("Microsoft YaHei UI", 9.5F);
+            search.Margin = new Padding(0, 0, 16, 0);
+            filters.Controls.Add(search, 1, 1);
+
+            // 刷新按钮样式
+            refresh.Text = "刷新";
+            refresh.FlatStyle = FlatStyle.Flat;
+            refresh.FlatAppearance.BorderSize = 1;
+            refresh.FlatAppearance.BorderColor = BorderColor;
+            refresh.BackColor = Color.White;
+            refresh.ForeColor = Ink;
+            refresh.Font = new Font("Microsoft YaHei UI", 9.5F, FontStyle.Regular);
+            refresh.Dock = DockStyle.Fill;
+            refresh.Margin = new Padding(0);
+            refresh.Cursor = Cursors.Hand;
+            filters.Controls.Add(refresh, 2, 1);
+
+            workspace.Controls.Add(filters, 0, 1);
+
+            // 2.3 内容分割区 (左列表 + 右预览)
+            var content = new SplitContainer
+            {
+                Dock = DockStyle.Fill,
+                Orientation = Orientation.Vertical,
+                Size = new Size(1140, 620),
+                SplitterDistance = 680,
+                SplitterWidth = 16,
+                Panel1MinSize = 420,
+                Panel2MinSize = 300,
+                BackColor = PaperBg
+            };
             workspace.Controls.Add(content, 0, 2);
-            grid.Dock = DockStyle.Fill; grid.AllowUserToAddRows = false; grid.AllowUserToDeleteRows = false;
-            grid.RowHeadersVisible = false; grid.SelectionMode = DataGridViewSelectionMode.FullRowSelect; grid.MultiSelect = false;
-            grid.BackgroundColor = Color.White; grid.BorderStyle = BorderStyle.None; grid.CellBorderStyle = DataGridViewCellBorderStyle.SingleHorizontal;
-            grid.GridColor = Color.FromArgb(236, 239, 234); grid.RowTemplate.Height = 56; grid.ColumnHeadersHeight = 40; grid.ColumnHeadersHeightSizeMode = DataGridViewColumnHeadersHeightSizeMode.DisableResizing;
-            grid.EnableHeadersVisualStyles = false; grid.ColumnHeadersBorderStyle = DataGridViewHeaderBorderStyle.None;
-            grid.ColumnHeadersDefaultCellStyle = new DataGridViewCellStyle { BackColor = Color.FromArgb(235, 239, 232), ForeColor = Muted, Font = new Font(Font.FontFamily, 9, FontStyle.Bold) };
-            grid.DefaultCellStyle = new DataGridViewCellStyle { BackColor = Color.White, ForeColor = Ink, SelectionBackColor = Color.FromArgb(221, 237, 223), SelectionForeColor = Ink, Padding = new Padding(5, 8, 5, 8) };
-            grid.AlternatingRowsDefaultCellStyle.BackColor = Color.FromArgb(251, 252, 249);
-            grid.Columns.Add(new DataGridViewCheckBoxColumn { Name = "Choose", HeaderText = "", Width = 36, SortMode = DataGridViewColumnSortMode.NotSortable });
-            AddColumn("Title", "会话", 230); AddColumn("Modified", "文件修改", 140); AddColumn("Conversation", "最后对话", 140);
-            AddColumn("Registered", "当前账号", 130); AddColumn("Id", "会话 ID", 105); AddColumn("Input", "请求输入", 110);
-            grid.Columns["Title"].AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill; grid.Columns["Title"].MinimumWidth = 150;
-            grid.Columns["Modified"].Visible = false; grid.Columns["Id"].Visible = false; grid.Columns["Input"].Visible = false;
-            grid.AccessibleName = "本地会话列表"; content.Panel1.Controls.Add(grid);
-            var previewLayout = new TableLayoutPanel { Dock = DockStyle.Fill, BackColor = Color.White, Padding = new Padding(20, 12, 20, 14), ColumnCount = 1, RowCount = 4 };
-            previewLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 28)); previewLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 70));
-            previewLayout.RowStyles.Add(new RowStyle(SizeType.Percent, 100)); previewLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 30)); content.Panel2.Controls.Add(previewLayout);
-            previewLayout.Controls.Add(LabelAt("CONVERSATION  /  对话预览", 9, Accent, FontStyle.Bold), 0, 0);
-            previewHeading.Dock = DockStyle.Fill; previewHeading.ForeColor = Ink; previewHeading.Font = new Font(Font.FontFamily, 10, FontStyle.Bold); previewHeading.AutoEllipsis = true;
-            previewHeading.Text = "点选一条会话\n在这里查看最近的对话。"; previewLayout.Controls.Add(previewHeading, 0, 1);
-            preview.Dock = DockStyle.Fill; preview.ReadOnly = true; preview.DetectUrls = false; preview.WordWrap = true; preview.BorderStyle = BorderStyle.None;
-            preview.BackColor = Color.White; preview.ScrollBars = RichTextBoxScrollBars.Vertical; preview.AccessibleName = "最近对话预览"; previewLayout.Controls.Add(preview, 0, 2);
-            previewLayout.Controls.Add(LabelAt("只读预览 · 原始会话记录保持完整", 8, Muted, FontStyle.Regular), 0, 3);
-            status.Dock = DockStyle.Fill; status.TextAlign = ContentAlignment.MiddleLeft; status.ForeColor = Muted; status.AutoEllipsis = true; workspace.Controls.Add(status, 0, 3);
+
+            // 2.3.1 会话表格配置
+            grid.Dock = DockStyle.Fill;
+            grid.AllowUserToAddRows = false;
+            grid.AllowUserToDeleteRows = false;
+            grid.RowHeadersVisible = false;
+            grid.SelectionMode = DataGridViewSelectionMode.FullRowSelect;
+            grid.MultiSelect = false;
+            grid.BackgroundColor = CardBg;
+            grid.BorderStyle = BorderStyle.None;
+            grid.CellBorderStyle = DataGridViewCellBorderStyle.SingleHorizontal;
+            grid.GridColor = Color.FromArgb(238, 241, 237);
+            grid.RowTemplate.Height = 48;
+            grid.ColumnHeadersHeight = 38;
+            grid.ColumnHeadersHeightSizeMode = DataGridViewColumnHeadersHeightSizeMode.DisableResizing;
+            grid.EnableHeadersVisualStyles = false;
+            grid.ColumnHeadersBorderStyle = DataGridViewHeaderBorderStyle.None;
+            grid.ColumnHeadersDefaultCellStyle = new DataGridViewCellStyle
+            {
+                BackColor = Color.FromArgb(238, 243, 237),
+                ForeColor = Muted,
+                Font = new Font("Microsoft YaHei UI", 9F, FontStyle.Bold),
+                Padding = new Padding(8, 0, 8, 0)
+            };
+            grid.DefaultCellStyle = new DataGridViewCellStyle
+            {
+                BackColor = Color.White,
+                ForeColor = Ink,
+                SelectionBackColor = RowSelectColor,
+                SelectionForeColor = Ink,
+                Font = new Font("Microsoft YaHei UI", 9F),
+                Padding = new Padding(8, 6, 8, 6)
+            };
+            grid.AlternatingRowsDefaultCellStyle.BackColor = Color.FromArgb(252, 253, 251);
+
+            grid.Columns.Add(new DataGridViewCheckBoxColumn
+            {
+                Name = "Choose",
+                HeaderText = "",
+                Width = 38,
+                SortMode = DataGridViewColumnSortMode.NotSortable
+            });
+            AddColumn("Title", "会话标题", 240);
+            AddColumn("Modified", "文件修改", 140);
+            AddColumn("Conversation", "最后对话时间", 145);
+            AddColumn("Registered", "Desktop 状态", 125);
+            AddColumn("Id", "会话 ID", 105);
+            AddColumn("Input", "请求输入", 110);
+
+            grid.Columns["Title"].AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill;
+            grid.Columns["Title"].MinimumWidth = 160;
+            grid.Columns["Modified"].Visible = false;
+            grid.Columns["Id"].Visible = false;
+            grid.Columns["Input"].Visible = false;
+            grid.AccessibleName = "本地会话列表";
+
+            var gridCard = new Panel
+            {
+                Dock = DockStyle.Fill,
+                BackColor = CardBg,
+                Padding = new Padding(1),
+                Margin = new Padding(0)
+            };
+            gridCard.Controls.Add(grid);
+            content.Panel1.Controls.Add(gridCard);
+
+            // 2.3.2 预览面板 (严格保留 TableLayoutPanel 4 行结构以保证 RenderWorkspace 兼容性)
+            var previewLayout = new TableLayoutPanel
+            {
+                Dock = DockStyle.Fill,
+                BackColor = CardBg,
+                Padding = new Padding(22, 16, 22, 16),
+                ColumnCount = 1,
+                RowCount = 4,
+                Margin = new Padding(0)
+            };
+            previewLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 26F));
+            previewLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 68F));
+            previewLayout.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
+            previewLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 26F));
+            content.Panel2.Controls.Add(previewLayout);
+
+            previewLayout.Controls.Add(LabelAt("CONVERSATION TRANSCRIPT  /  最近对话预览", 8.5F, AccentPrimary, FontStyle.Bold), 0, 0);
+
+            previewHeading.Dock = DockStyle.Fill;
+            previewHeading.ForeColor = Ink;
+            previewHeading.Font = new Font("Microsoft YaHei UI", 9.5F, FontStyle.Bold);
+            previewHeading.AutoEllipsis = true;
+            previewHeading.Text = "点选一条会话\n在此处查看对话上下文与执行进度。";
+            previewHeading.Margin = new Padding(0);
+            previewLayout.Controls.Add(previewHeading, 0, 1);
+
+            preview.Dock = DockStyle.Fill;
+            preview.ReadOnly = true;
+            preview.DetectUrls = false;
+            preview.WordWrap = true;
+            preview.BorderStyle = BorderStyle.None;
+            preview.BackColor = CardBg;
+            preview.ScrollBars = RichTextBoxScrollBars.Vertical;
+            preview.AccessibleName = "最近对话预览";
+            preview.Font = new Font("Microsoft YaHei UI", 9F);
+            preview.Margin = new Padding(0, 4, 0, 4);
+            previewLayout.Controls.Add(preview, 0, 2);
+
+            previewLayout.Controls.Add(LabelAt("只读预览 · 本地安全解析 · 不改写原始会话记录", 8F, Muted, FontStyle.Regular), 0, 3);
+
+            // 2.4 状态栏
+            var statusPanel = new Panel
+            {
+                Dock = DockStyle.Fill,
+                BackColor = Color.Transparent,
+                Margin = new Padding(0)
+            };
+            status.Dock = DockStyle.Fill;
+            status.TextAlign = ContentAlignment.MiddleLeft;
+            status.ForeColor = Muted;
+            status.Font = new Font("Microsoft YaHei UI", 8.5F);
+            status.AutoEllipsis = true;
+            statusPanel.Controls.Add(status);
+            workspace.Controls.Add(statusPanel, 0, 3);
+
             ResumeLayout(true);
         }
     }
