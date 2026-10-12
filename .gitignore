@@ -10,3 +10,6 @@ coverage.out
 *.bak
 *.log
 build-backups/
+config.local.json
+*.events.jsonl
+artifacts/

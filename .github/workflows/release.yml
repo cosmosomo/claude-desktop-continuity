@@ -1,110 +1,32 @@
-name: Release
-
+name: Portable release
 on:
   push:
-    branches: [main]
-  workflow_dispatch:
-
+    tags: ['v*']
 permissions:
-  contents: read
-
+  contents: write
 jobs:
-  quality:
-    name: Required quality checks
-    uses: ./.github/workflows/ci.yml
-    permissions:
-      contents: read
-
-  version:
-    name: Version and release
-    needs: quality
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-      pull-requests: write
-    outputs:
-      release_created: ${{ steps.release.outputs.release_created }}
-      tag_name: ${{ steps.release.outputs.tag_name }}
+  release:
+    runs-on: windows-latest
     steps:
-      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
-        with:
-          fetch-depth: 0
-          persist-credentials: false
-
-      - id: release
-        uses: googleapis/release-please-action@8b8fd2cc23b2e18957157a9d923d75aa0c6f6ad5 # v4
-        with:
-          release-type: go
-          target-branch: main
-
-  archives:
-    name: Publish CLI archives
-    needs: version
-    if: needs.version.outputs.release_created == 'true'
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-    steps:
-      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
-        with:
-          ref: ${{ needs.version.outputs.tag_name }}
-          fetch-depth: 0
-          persist-credentials: false
-
-      - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
-
-      - name: Test release commit
-        run: go test ./...
-
-      - uses: goreleaser/goreleaser-action@e435ccd777264be153ace6237001ef4d979d3a7a # v6
-        with:
-          version: "~> v2"
-          args: release --clean
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-  installers:
-    name: Publish Windows installer (${{ matrix.arch }})
-    needs: version
-    if: needs.version.outputs.release_created == 'true'
-    runs-on: windows-2022
-    permissions:
-      contents: write
-    strategy:
-      fail-fast: false
-      matrix:
-        arch: [amd64, arm64]
-    steps:
-      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
-        with:
-          ref: ${{ needs.version.outputs.tag_name }}
-          persist-credentials: false
-
-      - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
-        with:
-          go-version-file: go.mod
-
-      - name: Build Windows binary
-        shell: pwsh
-        env:
-          GOARCH: ${{ matrix.arch }}
-          VERSION: ${{ needs.version.outputs.tag_name }}
+      - shell: powershell
         run: |
-          $version = $env:VERSION.TrimStart('v')
-          ./scripts/project.ps1 -Task Build -Arch $env:GOARCH -Version $version
-
-      - uses: Minionguyjpro/Inno-Setup-Action@b8e8eb5936437c243592fda645c96dfc6488c275 # v1.2.2
+          ./scripts/continuity/Build.ps1
+          ./scripts/continuity/Package.ps1
+      - uses: softprops/action-gh-release@v2
         with:
-          path: installer/windows-claude-swap.iss
-          options: /DAppArch=${{ matrix.arch }} /DAppVersion=${{ needs.version.outputs.tag_name }}
+          files: artifacts/*.zip
+          prerelease: true
+          name: v0.1.0 — Windows Preview
+          body: |
+            Windows x64 预览版：整合已保存的 Desktop 账号与本地 Code 会话选择、最近对话预览和接续操作。
 
-      - name: Upload installer
-        shell: pwsh
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          TAG: ${{ needs.version.outputs.tag_name }}
-          ARCH: ${{ matrix.arch }}
-        run: |
-          gh release upload $env:TAG "installer/dist/installer/Claude-Desktop-Switcher-Setup-$env:ARCH.exe" --clobber --repo "${{ github.repository }}"
+            下载 ZIP，解压到固定目录，双击 Start.cmd；随后使用桌面“Claude账号与会话”快捷方式。
+
+            已通过 Go 测试、go vet、应用编译和 23 项本机真实数据/界面检查。
+            **整合界面的跨账号 A→B→A 实测待验收**：为保留当前正在运行的工作，本次没有重启 Desktop 做该测试。
+
+            切换账号会重启 Desktop，请先完成或停止任务。只支持本地 Code 会话；详情见 README.md 与 VALIDATION.md。

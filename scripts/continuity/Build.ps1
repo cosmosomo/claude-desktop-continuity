@@ -1,0 +1,34 @@
+param([string]$ConfigPath)
+$ErrorActionPreference = 'Stop'
+[Console]::OutputEncoding = [Text.UTF8Encoding]::new($false)
+$repositoryRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..\..'))
+$distributionRoot = Join-Path $repositoryRoot 'dist'
+New-Item -ItemType Directory -Path $distributionRoot -Force | Out-Null
+Push-Location $repositoryRoot
+try {
+    $env:GOOS = 'windows'; $env:GOARCH = 'amd64'; $env:CGO_ENABLED = '0'
+    Write-Output 'Verifying Go dependencies and upstream account engine...'
+    go mod verify
+    if ($LASTEXITCODE -ne 0) { throw 'Module verification failed.' }
+    go vet ./...
+    if ($LASTEXITCODE -ne 0) { throw 'Go vet failed.' }
+    go test ./...
+    if ($LASTEXITCODE -ne 0) { throw 'Go tests failed.' }
+    go build -trimpath -ldflags '-s -w -X github.com/TinoA/claude-desktop-switcher/cmd.Version=continuity-0.1.0' -o (Join-Path $distributionRoot 'switcher-cli.exe') .
+    if ($LASTEXITCODE -ne 0) { throw 'Account engine build failed.' }
+    go build -trimpath -ldflags '-s -w -H=windowsgui -X github.com/TinoA/claude-desktop-switcher/cmd.Version=continuity-0.1.0' -o (Join-Path $distributionRoot 'switcher-tray.exe') .
+    if ($LASTEXITCODE -ne 0) { throw 'Tray build failed.' }
+    Copy-Item -LiteralPath (Join-Path $repositoryRoot 'installer\assets\first-run-guide.bmp') -Destination $distributionRoot
+    $compiler = Join-Path $env:WINDIR 'Microsoft.NET\Framework64\v4.0.30319\csc.exe'
+    if (-not (Test-Path -LiteralPath $compiler)) { throw "Missing .NET Framework compiler: $compiler" }
+    $application = Join-Path $distributionRoot 'ClaudeDesktopContinuity.exe'
+    & $compiler /nologo /target:winexe /platform:x64 "/out:$application" /reference:System.Windows.Forms.dll /reference:System.Drawing.dll /reference:System.Web.Extensions.dll (Join-Path $repositoryRoot 'app\SessionImporter.cs') (Join-Path $repositoryRoot 'app\Continuity.cs')
+    if ($LASTEXITCODE -ne 0) { throw 'Continuity application build failed.' }
+    & $compiler /nologo /target:exe /platform:x64 "/out:$(Join-Path $distributionRoot 'LocalIntegrationTests.exe')" "/reference:$application" /reference:System.Windows.Forms.dll /reference:System.Drawing.dll /reference:System.Web.Extensions.dll (Join-Path $repositoryRoot 'app\LocalIntegrationTests.cs')
+    if ($LASTEXITCODE -ne 0) { throw 'Local integration test build failed.' }
+    if ($ConfigPath) {
+        & (Join-Path $distributionRoot 'LocalIntegrationTests.exe') ([IO.Path]::GetFullPath($ConfigPath))
+        if ($LASTEXITCODE -ne 0) { throw 'Local integration checks failed.' }
+    }
+    Write-Output 'Build completed. Run scripts/continuity/Setup.ps1 to create local configuration and a desktop shortcut.'
+} finally { Pop-Location }
