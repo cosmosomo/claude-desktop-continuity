@@ -2,7 +2,9 @@
 
 <div align="center">
 
-# 🌿 Claude Desktop Continuity
+<img src="cmd/assets/continuity.png" width="96" height="96" alt="Claude Desktop Continuity Icon" />
+
+# Claude Desktop Continuity
 
 **Windows 原生 Claude Desktop 多账号管理与本地 Code 会话无缝接续工作台**
 

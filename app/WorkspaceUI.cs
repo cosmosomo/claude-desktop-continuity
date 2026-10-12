@@ -66,6 +66,13 @@ namespace ClaudeSessionImporter
         {
             SuspendLayout();
             Text = "Continuity · Claude 账号与会话接续";
+            try
+            {
+                string iconFile = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "cmd", "assets", "continuity.ico");
+                if (System.IO.File.Exists(iconFile)) Icon = new Icon(iconFile);
+                else Icon = Icon.ExtractAssociatedIcon(Application.ExecutablePath);
+            }
+            catch { }
             Font = new Font("Microsoft YaHei UI", 9F);
             Size = new Size(1520, 920);
             MinimumSize = new Size(1220, 780);

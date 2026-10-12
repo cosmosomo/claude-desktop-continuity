@@ -21,12 +21,15 @@ try {
     Copy-Item -LiteralPath (Join-Path $repositoryRoot 'installer\assets\first-run-guide.bmp') -Destination $distributionRoot
     $compiler = Join-Path $env:WINDIR 'Microsoft.NET\Framework64\v4.0.30319\csc.exe'
     if (-not (Test-Path -LiteralPath $compiler)) { throw "Missing .NET Framework compiler: $compiler" }
+    $iconPath = Join-Path $repositoryRoot 'cmd\assets\continuity.ico'
     $application = Join-Path $distributionRoot 'ClaudeDesktopContinuity.exe'
-    & $compiler /nologo /target:winexe /platform:x64 "/out:$application" /reference:System.Windows.Forms.dll /reference:System.Drawing.dll /reference:System.Web.Extensions.dll (Join-Path $repositoryRoot 'app\SessionImporter.cs') (Join-Path $repositoryRoot 'app\Continuity.cs') (Join-Path $repositoryRoot 'app\WorkspaceUI.cs')
+    & $compiler /nologo /target:winexe /platform:x64 "/win32icon:$iconPath" "/out:$application" /reference:System.Windows.Forms.dll /reference:System.Drawing.dll /reference:System.Web.Extensions.dll (Join-Path $repositoryRoot 'app\SessionImporter.cs') (Join-Path $repositoryRoot 'app\Continuity.cs') (Join-Path $repositoryRoot 'app\WorkspaceUI.cs')
     if ($LASTEXITCODE -ne 0) { throw 'Continuity application build failed.' }
-    & $compiler /nologo /target:winexe /platform:x64 "/out:$(Join-Path $distributionRoot 'Continuity.exe')" /reference:System.Windows.Forms.dll (Join-Path $repositoryRoot 'app\Launcher.cs')
+    & $compiler /nologo /target:winexe /platform:x64 "/win32icon:$iconPath" "/out:$(Join-Path $distributionRoot 'Continuity.exe')" /reference:System.Windows.Forms.dll (Join-Path $repositoryRoot 'app\Launcher.cs')
     if ($LASTEXITCODE -ne 0) { throw 'Double-click launcher build failed.' }
     Copy-Item -LiteralPath (Join-Path $distributionRoot 'Continuity.exe') -Destination (Join-Path $repositoryRoot 'Continuity.exe') -Force
+    Copy-Item -LiteralPath $iconPath -Destination $distributionRoot -Force
+    Copy-Item -LiteralPath (Join-Path $repositoryRoot 'cmd\assets\continuity.png') -Destination $distributionRoot -Force
     & $compiler /nologo /target:exe /platform:x64 "/out:$(Join-Path $distributionRoot 'LocalIntegrationTests.exe')" "/reference:$application" /reference:System.Windows.Forms.dll /reference:System.Drawing.dll /reference:System.Web.Extensions.dll (Join-Path $repositoryRoot 'app\LocalIntegrationTests.cs')
     if ($LASTEXITCODE -ne 0) { throw 'Local integration test build failed.' }
     # 仅编译；真实账号切换验收必须获得用户允许后单独执行，不能进入 CI 自动测试。

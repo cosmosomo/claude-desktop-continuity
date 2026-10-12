@@ -1,4 +1,4 @@
-﻿$ErrorActionPreference = 'Stop'
+$ErrorActionPreference = 'Stop'
 [Console]::OutputEncoding = [Text.UTF8Encoding]::new($false)
 $repositoryRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..\..'))
 $distributionRoot = Join-Path $repositoryRoot 'dist'
@@ -39,6 +39,12 @@ $shortcut.TargetPath = Join-Path $repositoryRoot 'Continuity.exe'
 $shortcut.Arguments = ''
 $shortcut.WorkingDirectory = $repositoryRoot
 $shortcut.Description = '选择会话、预览对话、切换账号并继续原生 Claude Desktop'
+$iconPath = Join-Path $repositoryRoot 'cmd\assets\continuity.ico'
+if (Test-Path -LiteralPath $iconPath) {
+    $shortcut.IconLocation = "$iconPath, 0"
+} else {
+    $shortcut.IconLocation = "$(Join-Path $repositoryRoot 'Continuity.exe'), 0"
+}
 $shortcut.Save()
 Write-Output "Created: $shortcutPath"
 Write-Output "Configured Desktop mode: $($configuration.desktopMode). Read README for Gateway configuration."
