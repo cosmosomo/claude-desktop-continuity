@@ -40,6 +40,6 @@ try {
     if ($LASTEXITCODE -ne 0) { throw 'Cannot locate Go runtime license.' }
     Copy-Item -LiteralPath (Join-Path $goRoot 'LICENSE') -Destination (Join-Path $packageRoot 'licenses\Go-runtime-LICENSE')
 } finally { Pop-Location }
-$archive = Join-Path $artifactsRoot 'ClaudeDesktopContinuity-v0.2.0-windows-x64.zip'
+$archive = Join-Path $artifactsRoot 'ClaudeDesktopContinuity-v0.2.1-windows-x64.zip'
 Compress-Archive -LiteralPath $packageRoot -DestinationPath $archive -Force
 Get-FileHash -LiteralPath $archive -Algorithm SHA256 | Format-List

@@ -7,6 +7,7 @@ using System.Windows.Forms;
 // 用户下载后直接双击根目录 EXE；环境与配置仍由唯一 Setup 流程生成。
 public static class Launcher
 {
+    private static string diagnosticPath;
     [STAThread]
     public static int Main(string[] arguments)
     {
@@ -21,7 +22,7 @@ public static class Launcher
             if (!File.Exists(application) || !File.Exists(setup)) throw new IOException("软件目录不完整。请完整解压 ZIP 后再打开 Continuity.exe，不能只移动 EXE 文件。");
             if (!File.Exists(configuration))
             {
-                string eventPath = Path.Combine(root, "launcher.events.jsonl");
+                string eventPath = Path.Combine(root, "launcher.events.jsonl"); diagnosticPath = eventPath;
                 File.AppendAllText(eventPath, "{\"action\":\"setup_started\",\"at\":\"" + DateTimeOffset.UtcNow.ToString("o") + "\"}\n", new UTF8Encoding(false));
                 var start = new ProcessStartInfo { FileName = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.System), "WindowsPowerShell", "v1.0", "powershell.exe"),
                     Arguments = "-NoProfile -NonInteractive -ExecutionPolicy Bypass -File \"" + setup + "\"", WorkingDirectory = root,
@@ -40,6 +41,15 @@ public static class Launcher
             Process.Start(new ProcessStartInfo { FileName = application, Arguments = "\"" + configuration + "\"", WorkingDirectory = Path.GetDirectoryName(application), UseShellExecute = false });
             return 0;
         }
-        catch (Exception ex) { MessageBox.Show(ex.Message, "Continuity · 启动失败", MessageBoxButtons.OK, MessageBoxIcon.Error); return 1; }
+        catch (Exception ex)
+        {
+            string report = ex.Message;
+            if (diagnosticPath != null)
+            {
+                try { File.AppendAllText(diagnosticPath, "{\"action\":\"setup_failed\",\"at\":\"" + DateTimeOffset.UtcNow.ToString("o") + "\",\"message\":\"" + ex.ToString().Replace("\\", "\\\\").Replace("\"", "\\\"").Replace("\r", "\\r").Replace("\n", "\\n").Replace("\t", "\\t") + "\"}\n", new UTF8Encoding(false)); }
+                catch (Exception loggingError) { report += "\n诊断日志也无法写入：" + loggingError.Message; Console.Error.WriteLine(loggingError); }
+            }
+            MessageBox.Show(report, "Continuity · 启动失败", MessageBoxButtons.OK, MessageBoxIcon.Error); return 1;
+        }
     }
 }

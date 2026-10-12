@@ -14,9 +14,9 @@ try {
     if ($LASTEXITCODE -ne 0) { throw 'Go vet failed.' }
     go test ./...
     if ($LASTEXITCODE -ne 0) { throw 'Go tests failed.' }
-    go build -trimpath -ldflags '-s -w -X github.com/TinoA/claude-desktop-switcher/cmd.Version=continuity-0.2.0' -o (Join-Path $distributionRoot 'switcher-cli.exe') .
+    go build -trimpath -ldflags '-s -w -X github.com/TinoA/claude-desktop-switcher/cmd.Version=continuity-0.2.1' -o (Join-Path $distributionRoot 'switcher-cli.exe') .
     if ($LASTEXITCODE -ne 0) { throw 'Account engine build failed.' }
-    go build -trimpath -ldflags '-s -w -H=windowsgui -X github.com/TinoA/claude-desktop-switcher/cmd.Version=continuity-0.2.0' -o (Join-Path $distributionRoot 'switcher-tray.exe') .
+    go build -trimpath -ldflags '-s -w -H=windowsgui -X github.com/TinoA/claude-desktop-switcher/cmd.Version=continuity-0.2.1' -o (Join-Path $distributionRoot 'switcher-tray.exe') .
     if ($LASTEXITCODE -ne 0) { throw 'Tray build failed.' }
     Copy-Item -LiteralPath (Join-Path $repositoryRoot 'installer\assets\first-run-guide.bmp') -Destination $distributionRoot
     $compiler = Join-Path $env:WINDIR 'Microsoft.NET\Framework64\v4.0.30319\csc.exe'

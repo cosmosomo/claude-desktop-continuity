@@ -20,7 +20,7 @@ jobs:
         with:
           files: artifacts/*.zip
           prerelease: true
-          name: v0.2.0 — Desktop Workspace Preview
+          name: v0.2.1 — Desktop Workspace Preview
           body: |
             Windows x64 预览版：整合已保存的 Desktop 账号与本地 Code 会话选择、最近对话预览和接续操作。
 
@@ -29,6 +29,7 @@ jobs:
             新增：启动/刷新默认勾选最近 12 小时内有实际对话的会话；账号列表显示保存的邮箱，可手动取消或补选。
             原生三栏 GUI：左侧账号和接续操作，中间会话列表，右侧对话预览。README 附真实应用脱敏截图，docs/DESIGN.md 记录设计与缺口。
             仍是预览版：账号添加/备份仍使用附带的原管理器；没有安装器和软件签名。
+            修复 Windows PowerShell 5.1 首次配置时中文脚本编码导致快捷方式创建失败的问题；已从无配置的真实解压目录验证首次启动、配置生成、主窗口显示和本机会话扫描。
             已通过 Go 测试、go vet、应用编译和本机真实数据/界面检查。
             2026-10-12 可见实测：退出并重新打开 Desktop 后，用户确认第二账号的历史和实际回复正常；切回原账号后，新增测试对话也保留。
             不保证所有历史和未来版本的兼容性，也不保证服务端缓存。

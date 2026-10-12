@@ -1,6 +1,6 @@
 # Validation boundaries
 
-Version 0.2.0 is a Windows x64 preview. Compatibility evidence is version-specific.
+Version 0.2.1 is a Windows x64 preview. Compatibility evidence is version-specific.
 Local validation on 2026-10-12: all six Go packages passed `go test ./...`, `go vet ./...` passed, and 23 real-data/frontend integration checks passed.
 After the 12-hour default-selection update, all 25 local real-data/frontend checks passed, including recent-session eligibility and manual cancellation; Go tests and vet passed again.
 
@@ -29,6 +29,8 @@ Subsequent user-visible acceptance on 2026-10-12: the initial fast round trip wa
 Version 0.1.1 adds default selection based on actual ordinary dialogue timestamps within the configured 12-hour window, plus saved-email account labels. Launch and explicit refresh apply the default selection; ordinary search and project filtering preserve manual changes. Local integration checks exercise selection eligibility and manual cancellation using real transcripts.
 
 Desktop workspace revision: three-column native layout and a root double-click launcher added. The same 25 real-data/frontend integration checks passed after the layout change. `RenderWorkspace` renders actual native controls and uses RichEdit's own print interface for conversation text; public exports redact sensitive display fields. This is application rendering, not capture of the user's desktop. Launcher compilation and actual launch with existing local config are separate checks; live account switching is not repeated for visual work.
+
+Portable first-run acceptance: a real freshly packaged directory with no configuration initially exposed a Windows PowerShell 5.1 UTF-8-without-BOM issue in the Chinese shortcut string. Setup.ps1 is now explicitly UTF-8 with BOM; launcher failures record an event and show a diagnostic. After fixing it, another fresh package directory successfully generated config, created the Chinese desktop shortcut, displayed the native main window and scanned actual local sessions. The test restored the previous desktop shortcut and normally closed only its own test application; Claude Desktop was not restarted.
 
 `Build.ps1` compiles `dist/LiveAcceptance.exe` but never runs it automatically. After completing or stopping Desktop tasks and explicitly consenting to two Desktop restarts, run it with the absolute local configuration path. It selects the latest registered real session, switches to another usable saved account, verifies adoption, and returns to the original account. A cycle error is logged and a return is attempted before reporting failure. This harness is not included in the portable release ZIP.
 
