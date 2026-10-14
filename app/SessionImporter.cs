@@ -731,9 +731,9 @@ namespace ClaudeSessionImporter
                     foreach (var message in messages)
                     {
                         preview.SelectionFont = headingFont;
-                        preview.SelectionColor = message.Role == "user" ? Color.FromArgb(30, 90, 160) : Color.FromArgb(40, 110, 70);
+                        preview.SelectionColor = message.Role == "user" ? Color.FromArgb(94, 87, 70) : Color.FromArgb(201, 100, 66);
                         preview.AppendText((message.Role == "user" ? "你" : "Claude") + "  " + TimeZoneInfo.ConvertTime(message.Timestamp, zone).ToString("MM-dd HH:mm:ss") + "\n");
-                        preview.SelectionFont = preview.Font; preview.SelectionColor = Color.FromArgb(35, 35, 35);
+                        preview.SelectionFont = preview.Font; preview.SelectionColor = Color.FromArgb(35, 34, 31);
                         preview.AppendText(message.Text + (message.Truncated ? "\n[此条内容已截短]" : String.Empty) + "\n\n");
                     }
                 }

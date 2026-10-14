@@ -6,19 +6,20 @@ namespace ClaudeSessionImporter
 {
     public sealed partial class Picker
     {
-        // 视觉色彩系统（Dark Pine + Warm Paper + Emerald Accent）
-        private static readonly Color PineDeep = Color.FromArgb(26, 44, 41);
-        private static readonly Color PineCard = Color.FromArgb(36, 59, 55);
-        private static readonly Color PineText = Color.FromArgb(240, 245, 242);
-        private static readonly Color PineMuted = Color.FromArgb(152, 173, 162);
-        private static readonly Color PaperBg = Color.FromArgb(248, 247, 244);
-        private static readonly Color CardBg = Color.White;
-        private static readonly Color Ink = Color.FromArgb(31, 45, 42);
-        private static readonly Color Muted = Color.FromArgb(104, 119, 112);
-        private static readonly Color AccentPrimary = Color.FromArgb(40, 125, 93);
-        private static readonly Color AccentHover = Color.FromArgb(49, 149, 111);
-        private static readonly Color BorderColor = Color.FromArgb(220, 226, 220);
-        private static readonly Color RowSelectColor = Color.FromArgb(229, 242, 233);
+        // 视觉色彩系统（Claude Official Warm Ivory + Oatmeal + Terracotta Coral）
+        private static readonly Color SidebarBg = Color.FromArgb(240, 238, 230);      // #F0EEE6 燕麦浅暖灰侧栏
+        private static readonly Color SidebarCard = Color.FromArgb(230, 227, 216);    // #E6E3D8 暖沙卡片底色
+        private static readonly Color SidebarBorder = Color.FromArgb(216, 212, 200);  // #D8D4C8 侧栏细边框
+        private static readonly Color PaperBg = Color.FromArgb(250, 249, 245);        // #FAF9F5 Claude 标志性暖白画布
+        private static readonly Color CardBg = Color.White;                           // #FFFFFF 纯白内容卡片
+        private static readonly Color Ink = Color.FromArgb(20, 20, 19);               // #141413 Anthropic 暖炭黑
+        private static readonly Color InkSub = Color.FromArgb(61, 57, 41);            // #3D3929 暖深褐副标题
+        private static readonly Color Muted = Color.FromArgb(124, 120, 106);          // #7C786A 暖石灰辅助字
+        private static readonly Color AccentPrimary = Color.FromArgb(217, 119, 87);   // #D97757 Claude 陶土珊瑚色 (Crail)
+        private static readonly Color AccentHover = Color.FromArgb(198, 97, 63);      // #C6613F 陶土深色悬停
+        private static readonly Color BorderColor = Color.FromArgb(230, 228, 221);    // #E6E4DD 暖调微边框
+        private static readonly Color RowSelectColor = Color.FromArgb(253, 242, 237); // #FDF2ED 柔和浅蜜桃选中态
+        private static readonly Color TableHeaderBg = Color.FromArgb(244, 242, 236);  // #F4F2EC 燕麦表头底色
 
         private Label LabelAt(string text, float size, Color color, FontStyle weight)
         {
@@ -39,10 +40,10 @@ namespace ClaudeSessionImporter
             button.Text = text;
             button.FlatStyle = FlatStyle.Flat;
             button.FlatAppearance.BorderSize = primary ? 0 : 1;
-            button.FlatAppearance.BorderColor = primary ? AccentPrimary : Color.FromArgb(88, 118, 110);
-            button.BackColor = primary ? AccentPrimary : PineCard;
-            button.ForeColor = primary ? Color.White : PineText;
-            button.Font = new Font("Microsoft YaHei UI", 10, FontStyle.Bold);
+            button.FlatAppearance.BorderColor = primary ? AccentPrimary : SidebarBorder;
+            button.BackColor = primary ? AccentPrimary : PaperBg;
+            button.ForeColor = primary ? Color.White : InkSub;
+            button.Font = new Font("Microsoft YaHei UI", 9.8F, FontStyle.Bold);
             button.Dock = DockStyle.Fill;
             button.Margin = new Padding(0, 4, 0, 4);
             button.Cursor = Cursors.Hand;
@@ -50,14 +51,16 @@ namespace ClaudeSessionImporter
             {
                 if (button.Enabled)
                 {
-                    button.BackColor = primary ? AccentHover : Color.FromArgb(48, 77, 72);
+                    button.BackColor = primary ? AccentHover : RowSelectColor;
+                    if (!primary) button.FlatAppearance.BorderColor = AccentPrimary;
                 }
             };
             button.MouseLeave += delegate
             {
                 if (button.Enabled)
                 {
-                    button.BackColor = primary ? AccentPrimary : PineCard;
+                    button.BackColor = primary ? AccentPrimary : PaperBg;
+                    if (!primary) button.FlatAppearance.BorderColor = SidebarBorder;
                 }
             };
         }
@@ -69,7 +72,7 @@ namespace ClaudeSessionImporter
             button.FlatAppearance.BorderSize = 1;
             button.FlatAppearance.BorderColor = BorderColor;
             button.BackColor = Color.White;
-            button.ForeColor = Ink;
+            button.ForeColor = InkSub;
             button.Font = new Font("Microsoft YaHei UI", 8.8F, FontStyle.Regular);
             button.Dock = DockStyle.Fill;
             button.Margin = margin;
@@ -79,6 +82,7 @@ namespace ClaudeSessionImporter
                 if (button.Enabled)
                 {
                     button.BackColor = RowSelectColor;
+                    button.ForeColor = AccentHover;
                     button.FlatAppearance.BorderColor = AccentPrimary;
                 }
             };
@@ -87,6 +91,7 @@ namespace ClaudeSessionImporter
                 if (button.Enabled)
                 {
                     button.BackColor = Color.White;
+                    button.ForeColor = InkSub;
                     button.FlatAppearance.BorderColor = BorderColor;
                 }
             };
@@ -110,7 +115,7 @@ namespace ClaudeSessionImporter
             ForeColor = Ink;
             StartPosition = FormStartPosition.CenterScreen;
 
-            // 根网格布局：左侧边栏 (290px) + 右工作区 (自适应)
+            // 根网格布局：左侧边栏 (296px) + 右工作区 (自适应)
             var root = new TableLayoutPanel
             {
                 Dock = DockStyle.Fill,
@@ -119,15 +124,15 @@ namespace ClaudeSessionImporter
                 Margin = new Padding(0),
                 BackColor = PaperBg
             };
-            root.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 290F));
+            root.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 296F));
             root.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100F));
             Controls.Add(root);
 
-            // ==================== 1. 侧边栏容器 ====================
+            // ==================== 1. 侧边栏容器（Claude 燕麦暖色风） ====================
             var sidebar = new Panel
             {
                 Dock = DockStyle.Fill,
-                BackColor = PineDeep,
+                BackColor = SidebarBg,
                 Padding = new Padding(24, 28, 24, 24),
                 Margin = new Padding(0)
             };
@@ -141,10 +146,10 @@ namespace ClaudeSessionImporter
                 RowCount = 5,
                 Margin = new Padding(0)
             };
-            // 品牌头(96px), 账号操作卡片(220px), 步骤提示(90px), 弹性空间(100%), 底部操作(140px)
+            // 品牌头(96px), 账号操作卡片(236px), 步骤提示(94px), 弹性空间(100%), 底部操作(140px)
             sidebarLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 96F));
-            sidebarLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 220F));
-            sidebarLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 90F));
+            sidebarLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 236F));
+            sidebarLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 94F));
             sidebarLayout.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
             sidebarLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 140F));
             sidebar.Controls.Add(sidebarLayout);
@@ -154,9 +159,9 @@ namespace ClaudeSessionImporter
             brandBox.RowStyles.Add(new RowStyle(SizeType.Absolute, 20F));
             brandBox.RowStyles.Add(new RowStyle(SizeType.Absolute, 46F));
             brandBox.RowStyles.Add(new RowStyle(SizeType.Absolute, 26F));
-            brandBox.Controls.Add(LabelAt("CLAUDE CONTINUITY", 8F, PineMuted, FontStyle.Bold), 0, 0);
-            brandBox.Controls.Add(LabelAt("Continuity", 26F, Color.White, FontStyle.Bold), 0, 1);
-            brandBox.Controls.Add(LabelAt("换个账号，无缝继续手头工作。", 9.5F, Color.FromArgb(200, 215, 207), FontStyle.Regular), 0, 2);
+            brandBox.Controls.Add(LabelAt("CLAUDE CONTINUITY", 8F, AccentPrimary, FontStyle.Bold), 0, 0);
+            brandBox.Controls.Add(LabelAt("Continuity", 25F, Ink, FontStyle.Bold), 0, 1);
+            brandBox.Controls.Add(LabelAt("换个账号，无缝继续手头工作。", 9.5F, Muted, FontStyle.Regular), 0, 2);
             sidebarLayout.Controls.Add(brandBox, 0, 0);
 
             // 1.2 目标账号与核心动作卡片
@@ -170,20 +175,22 @@ namespace ClaudeSessionImporter
             };
             actionCard.RowStyles.Add(new RowStyle(SizeType.Absolute, 24F));
             actionCard.RowStyles.Add(new RowStyle(SizeType.Absolute, 34F));
-            actionCard.RowStyles.Add(new RowStyle(SizeType.Absolute, 48F));
             actionCard.RowStyles.Add(new RowStyle(SizeType.Absolute, 50F));
-            actionCard.RowStyles.Add(new RowStyle(SizeType.Absolute, 44F));
+            actionCard.RowStyles.Add(new RowStyle(SizeType.Absolute, 50F));
+            actionCard.RowStyles.Add(new RowStyle(SizeType.Absolute, 46F));
 
-            actionCard.Controls.Add(LabelAt("目标账号", 9.5F, PineText, FontStyle.Bold), 0, 0);
+            actionCard.Controls.Add(LabelAt("目标账号", 9.5F, InkSub, FontStyle.Bold), 0, 0);
 
             accounts.DropDownStyle = ComboBoxStyle.DropDownList;
             accounts.Dock = DockStyle.Fill;
             accounts.AccessibleName = "选择目标账号";
+            accounts.BackColor = Color.White;
+            accounts.ForeColor = Ink;
             accounts.Font = new Font("Microsoft YaHei UI", 9.5F);
             accounts.Margin = new Padding(0, 2, 0, 6);
             actionCard.Controls.Add(accounts, 0, 1);
 
-            mode.ForeColor = PineMuted;
+            mode.ForeColor = Muted;
             mode.Dock = DockStyle.Fill;
             mode.AutoEllipsis = true;
             mode.Font = new Font("Microsoft YaHei UI", 8.5F);
@@ -203,11 +210,11 @@ namespace ClaudeSessionImporter
             var guideBox = new Panel
             {
                 Dock = DockStyle.Fill,
-                BackColor = PineCard,
+                BackColor = SidebarCard,
                 Padding = new Padding(14, 12, 14, 12),
                 Margin = new Padding(0, 6, 0, 6)
             };
-            var guideLabel = LabelAt("01 选择账号\n02 勾选要保留的会话\n03 一键接续至 Desktop", 9F, Color.FromArgb(210, 225, 218), FontStyle.Regular);
+            var guideLabel = LabelAt("01 选择目标账号（或保持当前）\n02 勾选新会话或单选预览行\n03 一键唤醒或无损迁移至 Desktop", 8.8F, InkSub, FontStyle.Regular);
             guideLabel.Dock = DockStyle.Fill;
             guideBox.Controls.Add(guideLabel);
             sidebarLayout.Controls.Add(guideBox, 0, 2);
@@ -227,8 +234,8 @@ namespace ClaudeSessionImporter
             StyleButton(manage, "添加账号 / 备份…", false);
             lowerBox.Controls.Add(manage, 0, 0);
 
-            lowerBox.Controls.Add(LabelAt("通过附带账号管理器管理凭据", 8F, PineMuted, FontStyle.Regular), 0, 1);
-            lowerBox.Controls.Add(LabelAt("切换会自动重启 Claude Desktop。\n请先完成正在进行的生成或任务。", 8F, PineMuted, FontStyle.Regular), 0, 2);
+            lowerBox.Controls.Add(LabelAt("通过附带账号管理器管理凭据", 8F, Muted, FontStyle.Regular), 0, 1);
+            lowerBox.Controls.Add(LabelAt("跨账号切换会自动重启 Claude Desktop。\n同账号直接唤醒不会重启。", 8F, Muted, FontStyle.Regular), 0, 2);
 
             sidebarLayout.Controls.Add(lowerBox, 0, 4);
 
@@ -337,7 +344,7 @@ namespace ClaudeSessionImporter
             grid.BackgroundColor = CardBg;
             grid.BorderStyle = BorderStyle.None;
             grid.CellBorderStyle = DataGridViewCellBorderStyle.SingleHorizontal;
-            grid.GridColor = Color.FromArgb(238, 241, 237);
+            grid.GridColor = Color.FromArgb(240, 238, 232);
             grid.RowTemplate.Height = 48;
             grid.ColumnHeadersHeight = 38;
             grid.ColumnHeadersHeightSizeMode = DataGridViewColumnHeadersHeightSizeMode.DisableResizing;
@@ -345,8 +352,8 @@ namespace ClaudeSessionImporter
             grid.ColumnHeadersBorderStyle = DataGridViewHeaderBorderStyle.None;
             grid.ColumnHeadersDefaultCellStyle = new DataGridViewCellStyle
             {
-                BackColor = Color.FromArgb(238, 243, 237),
-                ForeColor = Muted,
+                BackColor = TableHeaderBg,
+                ForeColor = InkSub,
                 Font = new Font("Microsoft YaHei UI", 9F, FontStyle.Bold),
                 Padding = new Padding(8, 0, 8, 0)
             };
@@ -359,7 +366,7 @@ namespace ClaudeSessionImporter
                 Font = new Font("Microsoft YaHei UI", 9F),
                 Padding = new Padding(8, 6, 8, 6)
             };
-            grid.AlternatingRowsDefaultCellStyle.BackColor = Color.FromArgb(252, 253, 251);
+            grid.AlternatingRowsDefaultCellStyle.BackColor = Color.FromArgb(252, 251, 248);
 
             grid.Columns.Add(new DataGridViewCheckBoxColumn
             {
@@ -385,7 +392,7 @@ namespace ClaudeSessionImporter
             var gridCard = new Panel
             {
                 Dock = DockStyle.Fill,
-                BackColor = CardBg,
+                BackColor = BorderColor,
                 Padding = new Padding(1),
                 Margin = new Padding(0)
             };
