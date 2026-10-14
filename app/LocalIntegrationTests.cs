@@ -120,6 +120,14 @@ public static class LocalIntegrationTests
                 grid.CurrentCell = grid.Rows[1].Cells["Title"]; WaitPreview(picker);
                 Check(Field<Label>(picker, "previewHeading").Text.Contains(((Session)grid.Rows[1].Tag).Id.Substring(0, 8)), "row change cannot display previous row's preview");
                 Check(grid.Columns.Contains("Input") && Field<Button>(picker, "switchOpen").Enabled, "request size and switch-and-continue action are present");
+                continuity.ValidateAccountTarget(target);
+                Check(true, "pure account switch target validation succeeds without sessions");
+                typeof(Picker).GetMethod("SelectOnlyPreviewed", BindingFlags.Instance | BindingFlags.NonPublic).Invoke(picker, null);
+                Check(selected.Count == 1 && selected.ContainsKey(((Session)grid.Rows[1].Tag).Path), "select-only-previewed isolates current row");
+                typeof(Picker).GetMethod("SelectUnregisteredOnly", BindingFlags.Instance | BindingFlags.NonPublic).Invoke(picker, null);
+                Check(selected.Values.All(s => s.CwdExists && !s.IsRegisteredFor(Field<string>(picker, "provider"))), "select-only-unregistered filters out already registered sessions");
+                typeof(Picker).GetMethod("ClearAllSelection", BindingFlags.Instance | BindingFlags.NonPublic).Invoke(picker, null);
+                Check(selected.Count == 0 && Field<Button>(picker, "open").Text == "打开当前预览会话" && Field<Button>(picker, "switchOpen").Enabled, "zero selection adapts button labels for preview-open or pure account switch");
             }
             Check(Digest(sessionWithText.Path) == before, "read-only testing leaves original transcript byte-identical");
             Console.WriteLine("RESULT: " + passed + " checks passed; no live switch, import or model request performed."); return 0;

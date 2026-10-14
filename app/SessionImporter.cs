@@ -131,6 +131,16 @@ namespace ClaudeSessionImporter
         public long? CompactAfter;
         public DateTimeOffset? UsageAt;
         public long? InputTokens;
+
+        public bool CwdExists
+        {
+            get { return !String.IsNullOrWhiteSpace(Cwd) && System.IO.Path.IsPathRooted(Cwd) && Directory.Exists(Cwd); }
+        }
+
+        public bool IsRegisteredFor(string currentProvider)
+        {
+            return currentProvider == "claude-desktop-official" ? OfficialRegistered : GatewayRegistered;
+        }
     }
 
     public sealed class EventLog
@@ -463,8 +473,9 @@ namespace ClaudeSessionImporter
                 var identity = ResolveIdentity(expectedProvider);
                 EnsureIdentity(identity, expectedIdentity);
                 string indexRoot = identity.IndexRoot;
-                progress.Report("正在导入/打开：" + session.Title + " · " + session.Id.Substring(0, 8));
-                log.Write("desktop_open_started", "id=" + session.Id + ";provider=" + expectedProvider +
+                bool alreadyRegistered = ReadIndexes(indexRoot).ContainsKey(session.Id);
+                progress.Report((alreadyRegistered ? "正在唤醒已有会话：" : "正在导入新会话：") + session.Title + " · " + session.Id.Substring(0, 8));
+                log.Write(alreadyRegistered ? "desktop_reopen_started" : "desktop_open_started", "id=" + session.Id + ";provider=" + expectedProvider +
                     ";account=" + identity.AccountId + ";org=" + identity.OrgId + ";indexRoot=" + indexRoot);
                 Process.Start(new ProcessStartInfo { FileName = ResumeUri(session.Id), UseShellExecute = true, WorkingDirectory = session.Cwd });
                 // 只发送一次原生链接；等待实际索引登记，超时明确失败，不改写 Desktop 内部数据。
@@ -483,7 +494,7 @@ namespace ClaudeSessionImporter
                 var registered = ReadIndexes(indexRoot)[session.Id];
                 if (expectedProvider == "claude-desktop-official") session.OfficialRegistered = true;
                 else session.GatewayRegistered = true;
-                log.Write("desktop_open_finished", "id=" + session.Id + ";registered=true;desktopSession=" + registered.sessionId +
+                log.Write(alreadyRegistered ? "desktop_reopen_finished" : "desktop_open_finished", "id=" + session.Id + ";registered=true;desktopSession=" + registered.sessionId +
                     ";account=" + identity.AccountId + ";org=" + identity.OrgId);
                 await Task.Delay(settings.pollIntervalMs);
             }
@@ -501,6 +512,9 @@ namespace ClaudeSessionImporter
         private readonly ComboBox project = new ComboBox();
         private readonly TextBox search = new TextBox();
         private readonly Button refresh = new Button();
+        private readonly Button selectUnregistered = new Button();
+        private readonly Button clearSelection = new Button();
+        private readonly Button togglePreviewed = new Button();
         private readonly Button open = new Button();
         private readonly ComboBox accounts = new ComboBox();
         private readonly Button switchOpen = new Button();
@@ -513,6 +527,7 @@ namespace ClaudeSessionImporter
         private List<Session> sessions = new List<Session>();
         private readonly Dictionary<string, Session> checkedSessions = new Dictionary<string, Session>(StringComparer.OrdinalIgnoreCase);
         private string provider;
+        private string currentAccountName;
         private DesktopIdentity identity;
         private bool busy;
         private bool rendering;
@@ -527,8 +542,8 @@ namespace ClaudeSessionImporter
             continuity = new Continuity(settings, log, catalog);
             zone = TimeZoneInfo.FindSystemTimeZoneById(settings.timeZoneId);
             BuildLayout();
-            // SelectionChanged 发生时 CurrentCell 仍可能是上一行，等当前单元格更新后再读预览。
-            grid.CurrentCellChanged += delegate { if (!rendering && !busy) StartPreview(); };
+            // SelectionChanged 发生时 CurrentCell 仍可能是上一行，等当前单元格更新后再读预览并同步动作文案。
+            grid.CurrentCellChanged += delegate { if (!rendering && !busy) { UpdateSelection(); StartPreview(); } };
             grid.CurrentCellDirtyStateChanged += delegate { if (grid.IsCurrentCellDirty) grid.CommitEdit(DataGridViewDataErrorContexts.Commit); };
             grid.CellValueChanged += delegate(object sender, DataGridViewCellEventArgs args)
             {
@@ -539,7 +554,11 @@ namespace ClaudeSessionImporter
                 else checkedSessions.Remove(session.Path);
                 UpdateSelection();
             };
+            accounts.SelectedIndexChanged += delegate { if (!busy) UpdateSelection(); };
             refresh.Click += async delegate { await Reload(); };
+            selectUnregistered.Click += delegate { if (!busy) SelectUnregisteredOnly(); };
+            clearSelection.Click += delegate { if (!busy) ClearAllSelection(); };
+            togglePreviewed.Click += delegate { if (!busy) SelectOnlyPreviewed(); };
             project.SelectedIndexChanged += delegate { if (!busy) Render(); };
             search.TextChanged += delegate { if (!busy) Render(); };
             open.Click += async delegate { await Import(); };
@@ -559,6 +578,7 @@ namespace ClaudeSessionImporter
         {
             busy = value; refresh.Enabled = !value; project.Enabled = !value; search.Enabled = !value; open.Enabled = !value; grid.Enabled = !value;
             accounts.Enabled = !value; switchOpen.Enabled = !value; manage.Enabled = !value;
+            selectUnregistered.Enabled = !value; clearSelection.Enabled = !value; togglePreviewed.Enabled = !value;
         }
 
         private void Failure(Exception ex)
@@ -568,12 +588,65 @@ namespace ClaudeSessionImporter
             MessageBox.Show(this, ex.Message, "Claude 会话导入失败", MessageBoxButtons.OK, MessageBoxIcon.Error);
         }
 
+        private Session CurrentPreviewedSession()
+        {
+            return grid.CurrentRow == null ? null : grid.CurrentRow.Tag as Session;
+        }
+
+        private void SyncGridCheckboxes()
+        {
+            bool previous = rendering;
+            rendering = true;
+            try
+            {
+                foreach (DataGridViewRow row in grid.Rows)
+                {
+                    var session = row.Tag as Session;
+                    if (session != null) row.Cells["Choose"].Value = checkedSessions.ContainsKey(session.Path);
+                }
+            }
+            finally { rendering = previous; }
+        }
+
+        private void ClearAllSelection()
+        {
+            checkedSessions.Clear();
+            SyncGridCheckboxes();
+            UpdateSelection();
+            status.Text = "已清空所有勾选；此时可直接点击左侧「仅切换至此账号」，或点击「打开当前预览会话」。";
+        }
+
+        private void SelectUnregisteredOnly()
+        {
+            checkedSessions.Clear();
+            foreach (var session in sessions)
+            {
+                if (!session.IsRegisteredFor(provider) && session.CwdExists)
+                    checkedSessions[session.Path] = session;
+            }
+            SyncGridCheckboxes();
+            UpdateSelection();
+            if (checkedSessions.Count == 0)
+                status.Text = "所有有效本机会话均已在当前账号登记过，无需重复导入。";
+        }
+
+        private void SelectOnlyPreviewed()
+        {
+            var previewed = CurrentPreviewedSession();
+            if (previewed == null) return;
+            checkedSessions.Clear();
+            checkedSessions[previewed.Path] = previewed;
+            SyncGridCheckboxes();
+            UpdateSelection();
+        }
+
         private async Task Reload()
         {
             SetBusy(true); ClearPreview(); status.Text = "正在自动扫描本机会话…";
             try
             {
                 var accountState = await continuity.ReadAccounts();
+                currentAccountName = accountState.current;
                 accounts.Items.Clear();
                 foreach (var account in accountState.accounts) accounts.Items.Add(account);
                 accounts.DisplayMember = "Display";
@@ -594,7 +667,7 @@ namespace ClaudeSessionImporter
                 int selected = String.IsNullOrWhiteSpace(settings.initialProjectPath) ? 0 : project.Items.IndexOf(settings.initialProjectPath);
                 project.SelectedIndex = selected >= 0 ? selected : 0;
                 mode.Text = (provider == "claude-desktop-official" ? "官方订阅" : "API / Gateway") + " · 当前 " +
-                    (currentAccount == null ? "未匹配保存的账号" : currentAccount.Display) +
+                    (currentAccount == null ? "未匹配保存的账号（建议先保存）" : currentAccount.BaseDisplay) +
                     " · 默认勾选最近 " + settings.activeSessionHours + " 小时对话";
             }
             catch (Exception ex) { sessions.Clear(); checkedSessions.Clear(); grid.Rows.Clear(); Failure(ex); return; }
@@ -611,10 +684,11 @@ namespace ClaudeSessionImporter
                 if (project.SelectedIndex > 0 && session.Cwd != selectedProject) continue;
                 string haystack = (session.Title ?? String.Empty) + " " + session.Id + " " + session.ProjectFolder;
                 if (query.Length > 0 && haystack.IndexOf(query, StringComparison.OrdinalIgnoreCase) < 0) continue;
-                bool registered = provider == "claude-desktop-official" ? session.OfficialRegistered : session.GatewayRegistered;
+                bool registered = session.IsRegisteredFor(provider);
+                string stateLabel = !session.CwdExists ? "目录已缺失" : (registered ? "已登记（可打开）" : "未登记");
                 string modified = TimeZoneInfo.ConvertTimeFromUtc(session.ModifiedUtc, zone).ToString("MM-dd HH:mm:ss");
                 string last = session.ConversationAt.HasValue ? TimeZoneInfo.ConvertTime(session.ConversationAt.Value, zone).ToString("MM-dd HH:mm:ss") : "窗口内无对话";
-                int number = grid.Rows.Add(checkedSessions.ContainsKey(session.Path), session.Title, modified, last, registered ? "已登记（可打开）" : "未登记", session.Id.Substring(0, 8),
+                int number = grid.Rows.Add(checkedSessions.ContainsKey(session.Path), session.Title, modified, last, stateLabel, session.Id.Substring(0, 8),
                     session.InputTokens.HasValue ? session.InputTokens.Value.ToString("N0") : "片段内未知");
                 grid.Rows[number].Tag = session; grid.Rows[number].Cells["Title"].ToolTipText = session.Path + "\n" + session.Cwd;
                 grid.Rows[number].Cells["Id"].ToolTipText = session.Id;
@@ -635,7 +709,7 @@ namespace ClaudeSessionImporter
         private void StartPreview()
         {
             ClearPreview();
-            var session = grid.CurrentRow == null ? null : grid.CurrentRow.Tag as Session;
+            var session = CurrentPreviewedSession();
             if (session == null) { previewTask = Task.FromResult(0); return; }
             previewHeading.Text = "正在读取最近对话 · " + session.Title + " · " + session.Id.Substring(0, 8);
             previewCancellation = new CancellationTokenSource();
@@ -682,18 +756,152 @@ namespace ClaudeSessionImporter
 
         private void UpdateSelection()
         {
-            if (!busy) status.Text = "扫描到 " + sessions.Count + " 个会话，当前显示 " + grid.Rows.Count + " 个；已勾选 " + checkedSessions.Count + " 个（切换项目或搜索时保留选择）。";
+            int totalChecked = checkedSessions.Count;
+            int registeredChecked = checkedSessions.Values.Count(s => s.IsRegisteredFor(provider));
+            int unregisteredChecked = totalChecked - registeredChecked;
+            var target = accounts.SelectedItem as Account;
+            bool isSameAccount = target != null && !String.IsNullOrWhiteSpace(currentAccountName) &&
+                String.Equals(target.name, currentAccountName, StringComparison.Ordinal);
+            var previewed = CurrentPreviewedSession();
+
+            if (isSameAccount)
+            {
+                if (totalChecked == 0) switchOpen.Text = "当前已在该账号";
+                else if (unregisteredChecked == 0) switchOpen.Text = "在当前账号唤醒 (" + totalChecked + ")  →";
+                else switchOpen.Text = "在当前账号接续 (" + totalChecked + ")  →";
+            }
+            else
+            {
+                if (totalChecked == 0) switchOpen.Text = "仅切换至此账号  →";
+                else switchOpen.Text = "切换账号并接续 (" + totalChecked + ")  →";
+            }
+
+            if (totalChecked == 0)
+            {
+                open.Text = previewed != null ? "打开当前预览会话" : "在当前账号打开";
+            }
+            else if (unregisteredChecked == 0)
+            {
+                open.Text = "在当前账号唤醒 (" + totalChecked + ")";
+            }
+            else if (registeredChecked == 0)
+            {
+                open.Text = "导入新会话 (" + totalChecked + ")";
+            }
+            else
+            {
+                open.Text = "打开选中 (" + totalChecked + "：新" + unregisteredChecked + "/已有" + registeredChecked + ")";
+            }
+
+            if (previewed == null)
+            {
+                togglePreviewed.Text = "仅选此条";
+            }
+            else if (totalChecked == 1 && checkedSessions.ContainsKey(previewed.Path))
+            {
+                togglePreviewed.Text = "✓ 已仅选此条";
+            }
+            else
+            {
+                togglePreviewed.Text = "仅选此条会话";
+            }
+
+            if (!busy)
+            {
+                status.Text = "扫描到 " + sessions.Count + " 个会话，当前显示 " + grid.Rows.Count + " 个；已勾选 " +
+                    totalChecked + " 个（待新导入 " + unregisteredChecked + " 个、已登记 " + registeredChecked + " 个；切换项目或搜索时保留选择）。";
+            }
+        }
+
+        private List<Session> ResolveEffectiveSelection(List<Session> selected, bool forAccountSwitch)
+        {
+            var previewed = CurrentPreviewedSession();
+            if (selected.Count == 0 && !forAccountSwitch && previewed != null)
+            {
+                SelectOnlyPreviewed();
+                selected = Selected();
+            }
+
+            if (interactiveErrors && selected.Count > 0 && previewed != null && !checkedSessions.ContainsKey(previewed.Path))
+            {
+                string verb = forAccountSwitch ? "切换并接续" : "打开";
+                var choice = MessageBox.Show(this,
+                    "当前右侧正在预览的会话：\n「" + previewed.Title + "」（" + previewed.Id.Substring(0, 8) + "）尚未勾选。\n\n" +
+                    "• 点击【是】：仅" + verb + "当前正在预览的这 1 条会话\n" +
+                    "• 点击【否】：" + verb + "列表中已勾选的 " + selected.Count + " 条会话\n" +
+                    "• 点击【取消】：返回重新调整勾选",
+                    "确认目标会话", MessageBoxButtons.YesNoCancel, MessageBoxIcon.Question);
+                if (choice == DialogResult.Cancel) return null;
+                if (choice == DialogResult.Yes)
+                {
+                    SelectOnlyPreviewed();
+                    selected = Selected();
+                }
+            }
+
+            if (interactiveErrors && !forAccountSwitch && selected.Count > 1 && selected.All(s => s.IsRegisteredFor(provider)))
+            {
+                var focusTarget = (previewed != null && checkedSessions.ContainsKey(previewed.Path)) ? previewed : selected[0];
+                var choice = MessageBox.Show(this,
+                    "当前勾选的 " + selected.Count + " 个会话均已在当前账号登记过（与 Desktop 现有会话相同）。\n\n" +
+                    "• 点击【是】：仅在 Desktop 唤醒当前右侧预览的 1 条会话「" + focusTarget.Title + "」\n" +
+                    "• 点击【否】：逐一唤醒全部 " + selected.Count + " 个已登记会话\n" +
+                    "• 点击【取消】：取消操作",
+                    "唤醒已有会话确认", MessageBoxButtons.YesNoCancel, MessageBoxIcon.Information);
+                if (choice == DialogResult.Cancel) return null;
+                if (choice == DialogResult.Yes)
+                {
+                    checkedSessions.Clear();
+                    checkedSessions[focusTarget.Path] = focusTarget;
+                    SyncGridCheckboxes();
+                    UpdateSelection();
+                    selected = Selected();
+                }
+            }
+
+            var invalidCwd = selected.Where(s => !s.CwdExists).ToList();
+            var validCwd = selected.Where(s => s.CwdExists).ToList();
+            if (interactiveErrors && invalidCwd.Count > 0 && validCwd.Count > 0)
+            {
+                var choice = MessageBox.Show(this,
+                    "已勾选的会话中有 " + invalidCwd.Count + " 个本地工作目录已不存在（例如：" + invalidCwd[0].Cwd + "）。\n\n" +
+                    "是否自动跳过目录缺失的会话，仅继续处理其余 " + validCwd.Count + " 个有效会话？",
+                    "发现失效的工作目录", MessageBoxButtons.YesNo, MessageBoxIcon.Warning);
+                if (choice != DialogResult.Yes) return null;
+                foreach (var bad in invalidCwd) checkedSessions.Remove(bad.Path);
+                SyncGridCheckboxes();
+                UpdateSelection();
+                selected = validCwd;
+            }
+
+            return selected;
         }
 
         private async Task Import()
         {
-            var selected = Selected(); SetBusy(true);
+            await ImportCore(null);
+        }
+
+        private async Task ImportCore(string statusPrefix)
+        {
+            var selected = ResolveEffectiveSelection(Selected(), false);
+            if (selected == null) return;
+            int alreadyRegisteredCount = selected.Count(s => s.IsRegisteredFor(provider));
+            int newlyImportedCount = selected.Count - alreadyRegisteredCount;
+            SetBusy(true);
             try
             {
                 catalog.ValidateSelection(selected);
                 await catalog.OpenSelected(selected, provider, identity, new Progress<string>(detail => status.Text = detail));
-                status.Text = "完成：已把 " + selected.Count + " 个选中会话交给 Desktop。";
-                MessageBox.Show(this, status.Text, "Claude 会话导入", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                string summary;
+                if (newlyImportedCount == 0)
+                    summary = "已在当前账号唤醒 " + selected.Count + " 个已有会话。";
+                else if (alreadyRegisteredCount == 0)
+                    summary = "已把 " + selected.Count + " 个新会话导入当前 Desktop。";
+                else
+                    summary = "已新导入 " + newlyImportedCount + " 个会话，并唤醒 " + alreadyRegisteredCount + " 个已有会话。";
+                status.Text = "完成：" + (statusPrefix ?? String.Empty) + summary;
+                if (interactiveErrors) MessageBox.Show(this, status.Text, "Claude 会话接续", MessageBoxButtons.OK, MessageBoxIcon.Information);
             }
             catch (Exception ex) { Failure(ex); }
             finally { string outcome = status.Text; SetBusy(false); Render(); status.Text = outcome; }
@@ -701,12 +909,64 @@ namespace ClaudeSessionImporter
 
         private async Task SwitchAndContinue()
         {
-            var selected = Selected(); var target = accounts.SelectedItem as Account;
+            var target = accounts.SelectedItem as Account;
+            var rawSelected = Selected();
+            bool isSameAccount = target != null && !String.IsNullOrWhiteSpace(currentAccountName) &&
+                String.Equals(target.name, currentAccountName, StringComparison.Ordinal);
+
+            if (isSameAccount)
+            {
+                if (rawSelected.Count == 0)
+                {
+                    var previewed = CurrentPreviewedSession();
+                    if (interactiveErrors && previewed != null)
+                    {
+                        var choice = MessageBox.Show(this,
+                            "所选目标账号「" + target.BaseDisplay + "」即为当前在线账号，且未勾选任何会话。\n\n" +
+                            "是否直接在当前账号打开右侧正在预览的会话「" + previewed.Title + "」？",
+                            "当前已在该账号", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
+                        if (choice == DialogResult.Yes)
+                        {
+                            SelectOnlyPreviewed();
+                            await ImportCore("目标账号即为当前在线账号；");
+                        }
+                        else
+                        {
+                            status.Text = "当前已在账号「" + target.BaseDisplay + "」，未执行切换。";
+                        }
+                        return;
+                    }
+                    status.Text = "当前已在账号「" + target.BaseDisplay + "」，如需切换至其他账号请先在左上角下拉框选择。";
+                    if (interactiveErrors) MessageBox.Show(this, status.Text, "当前已在该账号", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    return;
+                }
+                await ImportCore("目标账号即为当前在线账号；");
+                return;
+            }
+
+            if (rawSelected.Count == 0)
+            {
+                SetBusy(true);
+                try
+                {
+                    await continuity.SwitchOnly(target, new Progress<string>(detail => status.Text = detail));
+                    SetBusy(false);
+                    await Reload();
+                    status.Text = "完成：已切换至账号 " + (target == null ? "" : target.BaseDisplay) + "（纯账号切换，未导入旧会话）。";
+                    if (interactiveErrors) MessageBox.Show(this, status.Text, "Claude 账号切换", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                }
+                catch (Exception ex) { Failure(ex); }
+                finally { SetBusy(false); }
+                return;
+            }
+
+            var selected = ResolveEffectiveSelection(rawSelected, true);
+            if (selected == null) return;
             SetBusy(true);
             try
             {
                 await continuity.SwitchAndOpen(selected, target, new Progress<string>(detail => status.Text = detail));
-                SetBusy(false); await Reload(); status.Text = "完成：已在目标账号接续 " + selected.Count + " 个会话。";
+                SetBusy(false); await Reload(); status.Text = "完成：已切换至 " + target.BaseDisplay + " 并接续 " + selected.Count + " 个会话。";
             }
             catch (Exception ex) { Failure(ex); }
             finally { SetBusy(false); }

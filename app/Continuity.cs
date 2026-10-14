@@ -13,7 +13,15 @@ namespace ClaudeSessionImporter
         public string name { get; set; }
         public string email { get; set; }
         public string health { get; set; }
-        public string Display { get { return (String.IsNullOrWhiteSpace(email) ? name + "（邮箱未记录）" : email) + (health == "usable" ? "" : "（需重新登录：" + health + "）"); } }
+        public bool isCurrent { get; set; }
+        public string BaseDisplay
+        {
+            get { return (String.IsNullOrWhiteSpace(email) ? name + "（邮箱未记录）" : email) + (health == "usable" ? "" : "（需重新登录：" + health + "）"); }
+        }
+        public string Display
+        {
+            get { return BaseDisplay + (isCurrent ? " · [当前在线]" : ""); }
+        }
     }
     public sealed class AccountState
     {
@@ -33,6 +41,8 @@ namespace ClaudeSessionImporter
             var state = Json.Serializer().Deserialize<AccountState>(await Run(new[] { "continuity-accounts" }, null));
             if (state == null || state.accounts == null || state.accounts.Any(account => String.IsNullOrWhiteSpace(account.name) || String.IsNullOrWhiteSpace(account.health)))
                 throw new IOException("账号服务返回的数据不完整。");
+            foreach (var account in state.accounts)
+                account.isCurrent = !String.IsNullOrWhiteSpace(state.current) && String.Equals(account.name, state.current, StringComparison.Ordinal);
             return state;
         }
         public void OpenAccountManager()
@@ -41,12 +51,29 @@ namespace ClaudeSessionImporter
             Process.Start(new ProcessStartInfo { FileName = settings.switcherGuiPath, WorkingDirectory = Path.GetDirectoryName(settings.switcherGuiPath), UseShellExecute = false });
             log.Write("account_manager_launched", "use tray Add account or Backup");
         }
-        public void ValidatePlan(List<Session> selected, Account target)
+        public void ValidateAccountTarget(Account target)
         {
-            catalog.ValidateSelection(selected);
             if (catalog.CurrentProvider() != "claude-desktop-official") throw new IOException("先在 CC Switch 切回官方 Desktop 并重启；账号切换不会修改 Gateway 配置。");
             if (target == null || String.IsNullOrWhiteSpace(target.name)) throw new ArgumentException("请选择目标账号；没有账号时点击添加账号 / 备份。");
             if (target.health != "usable") throw new IOException("目标账号登录状态不可用，请先在账号管理器中重新登录。");
+        }
+        public void ValidatePlan(List<Session> selected, Account target)
+        {
+            catalog.ValidateSelection(selected);
+            ValidateAccountTarget(target);
+        }
+        public async Task SwitchOnly(Account target, IProgress<string> progress)
+        {
+            ValidateAccountTarget(target);
+            var before = await ReadAccounts();
+            if (!before.accounts.Any(account => account.name == target.name && account.health == "usable"))
+                throw new IOException("目标账号状态已变化，请刷新列表。");
+            log.Write("switch_only_started", "target=" + target.name);
+            await Run(new[] { "use", "--", target.name }, progress);
+            var after = await ReadAccounts();
+            if (after.current != target.name)
+                throw new IOException("Desktop 恢复后的账号不等于所选账号。");
+            log.Write("switch_only_finished", "target=" + target.name);
         }
         public async Task SwitchAndOpen(List<Session> selected, Account target, IProgress<string> progress)
         {

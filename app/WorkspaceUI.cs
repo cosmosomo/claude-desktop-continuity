@@ -62,6 +62,36 @@ namespace ClaudeSessionImporter
             };
         }
 
+        private void StyleSecondaryToolButton(Button button, string text, Padding margin)
+        {
+            button.Text = text;
+            button.FlatStyle = FlatStyle.Flat;
+            button.FlatAppearance.BorderSize = 1;
+            button.FlatAppearance.BorderColor = BorderColor;
+            button.BackColor = Color.White;
+            button.ForeColor = Ink;
+            button.Font = new Font("Microsoft YaHei UI", 8.8F, FontStyle.Regular);
+            button.Dock = DockStyle.Fill;
+            button.Margin = margin;
+            button.Cursor = Cursors.Hand;
+            button.MouseEnter += delegate
+            {
+                if (button.Enabled)
+                {
+                    button.BackColor = RowSelectColor;
+                    button.FlatAppearance.BorderColor = AccentPrimary;
+                }
+            };
+            button.MouseLeave += delegate
+            {
+                if (button.Enabled)
+                {
+                    button.BackColor = Color.White;
+                    button.FlatAppearance.BorderColor = BorderColor;
+                }
+            };
+        }
+
         private void BuildLayout()
         {
             SuspendLayout();
@@ -234,48 +264,52 @@ namespace ClaudeSessionImporter
             header.Controls.Add(LabelAt("最近 " + settings.activeSessionHours + " 小时内有新对话的会话已预先勾选。点击任意行，可在右侧查阅历史记录。", 9.5F, Muted, FontStyle.Regular), 0, 2);
             workspace.Controls.Add(header, 0, 0);
 
-            // 2.2 筛选栏
+            // 2.2 筛选栏与快捷勾选操作
             var filters = new TableLayoutPanel
             {
                 Dock = DockStyle.Fill,
-                ColumnCount = 3,
+                ColumnCount = 5,
                 RowCount = 2,
                 Padding = new Padding(0, 0, 0, 8),
                 Margin = new Padding(0)
             };
-            filters.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 260F));
+            filters.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 240F));
             filters.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100F));
-            filters.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 96F));
+            filters.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 114F));
+            filters.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 92F));
+            filters.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 76F));
             filters.RowStyles.Add(new RowStyle(SizeType.Absolute, 20F));
             filters.RowStyles.Add(new RowStyle(SizeType.Absolute, 34F));
 
             filters.Controls.Add(LabelAt("项目目录", 9F, Muted, FontStyle.Bold), 0, 0);
             filters.Controls.Add(LabelAt("搜索会话标题、ID 或项目名称", 9F, Muted, FontStyle.Bold), 1, 0);
+            var quickSelectLabel = LabelAt("快捷勾选", 9F, Muted, FontStyle.Bold);
+            filters.Controls.Add(quickSelectLabel, 2, 0);
+            filters.SetColumnSpan(quickSelectLabel, 2);
 
             project.DropDownStyle = ComboBoxStyle.DropDownList;
             project.Dock = DockStyle.Fill;
             project.Font = new Font("Microsoft YaHei UI", 9.5F);
-            project.Margin = new Padding(0, 0, 16, 0);
+            project.Margin = new Padding(0, 0, 14, 0);
             filters.Controls.Add(project, 0, 1);
 
             search.Dock = DockStyle.Fill;
             search.AccessibleName = "搜索会话";
             search.Font = new Font("Microsoft YaHei UI", 9.5F);
-            search.Margin = new Padding(0, 0, 16, 0);
+            search.Margin = new Padding(0, 0, 14, 0);
             filters.Controls.Add(search, 1, 1);
 
-            // 刷新按钮样式
-            refresh.Text = "刷新";
-            refresh.FlatStyle = FlatStyle.Flat;
-            refresh.FlatAppearance.BorderSize = 1;
-            refresh.FlatAppearance.BorderColor = BorderColor;
-            refresh.BackColor = Color.White;
-            refresh.ForeColor = Ink;
-            refresh.Font = new Font("Microsoft YaHei UI", 9.5F, FontStyle.Regular);
-            refresh.Dock = DockStyle.Fill;
-            refresh.Margin = new Padding(0);
-            refresh.Cursor = Cursors.Hand;
-            filters.Controls.Add(refresh, 2, 1);
+            StyleSecondaryToolButton(selectUnregistered, "仅勾未登记", new Padding(0, 0, 8, 0));
+            selectUnregistered.AccessibleName = "仅勾选未登记会话";
+            filters.Controls.Add(selectUnregistered, 2, 1);
+
+            StyleSecondaryToolButton(clearSelection, "清空勾选", new Padding(0, 0, 8, 0));
+            clearSelection.AccessibleName = "清空所有勾选";
+            filters.Controls.Add(clearSelection, 3, 1);
+
+            StyleSecondaryToolButton(refresh, "刷新", new Padding(0));
+            refresh.AccessibleName = "刷新列表";
+            filters.Controls.Add(refresh, 4, 1);
 
             workspace.Controls.Add(filters, 0, 1);
 
@@ -368,13 +402,27 @@ namespace ClaudeSessionImporter
                 RowCount = 4,
                 Margin = new Padding(0)
             };
-            previewLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 26F));
+            previewLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 30F));
             previewLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 68F));
             previewLayout.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
             previewLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 26F));
             content.Panel2.Controls.Add(previewLayout);
 
-            previewLayout.Controls.Add(LabelAt("CONVERSATION TRANSCRIPT  /  最近对话预览", 8.5F, AccentPrimary, FontStyle.Bold), 0, 0);
+            var previewTopBar = new TableLayoutPanel
+            {
+                Dock = DockStyle.Fill,
+                ColumnCount = 2,
+                RowCount = 1,
+                Margin = new Padding(0)
+            };
+            previewTopBar.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100F));
+            previewTopBar.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 112F));
+            previewTopBar.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
+            previewTopBar.Controls.Add(LabelAt("CONVERSATION TRANSCRIPT  /  最近对话预览", 8.5F, AccentPrimary, FontStyle.Bold), 0, 0);
+            StyleSecondaryToolButton(togglePreviewed, "仅选此条会话", new Padding(0, 1, 0, 1));
+            togglePreviewed.AccessibleName = "仅选当前预览会话";
+            previewTopBar.Controls.Add(togglePreviewed, 1, 0);
+            previewLayout.Controls.Add(previewTopBar, 0, 0);
 
             previewHeading.Dock = DockStyle.Fill;
             previewHeading.ForeColor = Ink;
