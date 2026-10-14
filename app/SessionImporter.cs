@@ -552,6 +552,7 @@ namespace ClaudeSessionImporter
                 if (session == null) return;
                 if (Equals(row.Cells["Choose"].Value, true)) checkedSessions[session.Path] = session;
                 else checkedSessions.Remove(session.Path);
+                grid.InvalidateRow(args.RowIndex);
                 UpdateSelection();
             };
             accounts.SelectedIndexChanged += delegate { if (!busy) UpdateSelection(); };
