@@ -13,19 +13,19 @@ namespace ClaudeSessionImporter
         private static readonly Color SidebarBorder = Color.FromArgb(230, 227, 219);   // #E6E3DB 侧栏柔和分割线
         private static readonly Color PaperBg = Color.FromArgb(250, 249, 246);         // #FAF9F6 主工作区暖白画布
         private static readonly Color CardBg = Color.White;                            // #FFFFFF 纯白卡片
-        private static readonly Color Ink = Color.FromArgb(24, 24, 23);                // #181817 主标题炭黑
-        private static readonly Color InkSub = Color.FromArgb(58, 55, 48);             // #3A3730 正文深暖灰
-        private static readonly Color Muted = Color.FromArgb(132, 128, 118);           // #848076 辅助说明暖灰
-        private static readonly Color AccentPrimary = Color.FromArgb(224, 93, 52);     // #E05D34 Claude 活力珊瑚陶土橙
-        private static readonly Color AccentHover = Color.FromArgb(201, 77, 38);       // #C94D26 悬停深珊瑚橙
-        private static readonly Color AccentSoft = Color.FromArgb(253, 239, 233);      // #FDEFE9 浅蜜桃粉徽章/胶囊底色
-        private static readonly Color BorderColor = Color.FromArgb(228, 225, 218);     // #E4E1DA 卡片与控件圆角细边框
-        private static readonly Color RowSelectColor = Color.FromArgb(253, 242, 236);  // #FDF2EC 选中行浅暖橙底色
+        private static readonly Color Ink = Color.FromArgb(28, 27, 25);                // #1C1B19 温和深炭黑（不刺眼）
+        private static readonly Color InkSub = Color.FromArgb(68, 64, 57);             // #444039 正文暖深灰
+        private static readonly Color Muted = Color.FromArgb(132, 127, 117);           // #847F75 辅助说明暖灰
+        private static readonly Color AccentPrimary = Color.FromArgb(217, 101, 60);    // #D9653C Claude 柔和陶土珊瑚色
+        private static readonly Color AccentHover = Color.FromArgb(196, 84, 45);       // #C4542D 悬停陶土色
+        private static readonly Color AccentSoft = Color.FromArgb(252, 239, 233);      // #FCEFE9 浅蜜桃粉徽章底色
+        private static readonly Color BorderColor = Color.FromArgb(228, 225, 218);     // #E4E1DA 卡片圆角细边框
+        private static readonly Color RowSelectColor = Color.FromArgb(253, 243, 238);  // #FDF3EE 选中行浅暖底色
         private static readonly Color TableHeaderBg = Color.FromArgb(247, 246, 242);   // #F7F6F2 现代浅灰白表头
-        private static readonly Color PillGreenBg = Color.FromArgb(231, 246, 237);     // #E7F6ED 已登记薄荷绿胶囊底色
-        private static readonly Color PillGreenFg = Color.FromArgb(31, 136, 73);       // #1F8849 已登记翠绿文字
+        private static readonly Color PillGreenBg = Color.FromArgb(232, 246, 238);     // #E8F6EE 已登记薄荷绿胶囊底色
+        private static readonly Color PillGreenFg = Color.FromArgb(28, 128, 69);       // #1C8045 已登记森林绿文字
         private static readonly Color PillAmberBg = Color.FromArgb(254, 242, 232);     // #FEF2E8 未登记暖橙胶囊底色
-        private static readonly Color PillAmberFg = Color.FromArgb(212, 96, 46);       // #D4602E 未登记暖橙文字
+        private static readonly Color PillAmberFg = Color.FromArgb(204, 92, 43);       // #CC5C2B 未登记暖橙文字
         private static readonly Color PillGrayBg = Color.FromArgb(241, 239, 235);      // #F1EFEB 缺失目录灰底
         private static readonly Color PillGrayFg = Color.FromArgb(135, 130, 122);     // #87827A 缺失目录灰字
 
@@ -46,6 +46,17 @@ namespace ClaudeSessionImporter
             return path;
         }
 
+        // 显式传入背景色的 ClearType 文本绘制，彻底消除 GDI+ 透明底色导致的文字黑边与发虚粘连
+        private static void DrawSharpText(Graphics g, string text, Font font, Rectangle bounds, Color fg, Color bg, TextFormatFlags flags)
+        {
+            TextRenderer.DrawText(g, text ?? String.Empty, font, bounds, fg, bg, flags);
+        }
+
+        private static void DrawSharpTextAt(Graphics g, string text, Font font, Point pt, Color fg, Color bg)
+        {
+            TextRenderer.DrawText(g, text ?? String.Empty, font, pt, fg, bg);
+        }
+
         private Label LabelAt(string text, float size, Color color, FontStyle weight)
         {
             return new Label
@@ -60,7 +71,7 @@ namespace ClaudeSessionImporter
             };
         }
 
-        // GDI+ 抗锯齿圆角主/次按钮
+        // GDI+ 抗锯齿圆角主/次按钮（带显式底色 ClearType 渲染，字迹干净锐利）
         private void StyleButton(Button button, string text, bool primary)
         {
             button.Text = text;
@@ -68,7 +79,7 @@ namespace ClaudeSessionImporter
             button.FlatAppearance.BorderSize = 0;
             button.BackColor = SidebarBg;
             button.ForeColor = primary ? Color.White : InkSub;
-            button.Font = new Font("Microsoft YaHei UI", 9.8F, FontStyle.Bold);
+            button.Font = new Font("Microsoft YaHei UI", 9.5F, primary ? FontStyle.Bold : FontStyle.Regular);
             button.Dock = DockStyle.Fill;
             button.Margin = new Padding(0, 4, 0, 4);
             button.Cursor = Cursors.Hand;
@@ -83,20 +94,21 @@ namespace ClaudeSessionImporter
                 g.TextRenderingHint = TextRenderingHint.ClearTypeGridFit;
                 g.Clear(SidebarBg);
 
+                Color fill = primary
+                    ? (hovered && button.Enabled ? AccentHover : AccentPrimary)
+                    : (hovered && button.Enabled ? RowSelectColor : Color.White);
+                if (!button.Enabled) fill = Color.FromArgb(236, 234, 228);
+
                 var rect = new RectangleF(1f, 1f, button.Width - 2.5f, button.Height - 2.5f);
-                using (var path = RoundRect(rect, 9f))
+                using (var path = RoundRect(rect, 8.5f))
                 {
-                    Color fill = primary
-                        ? (hovered && button.Enabled ? AccentHover : AccentPrimary)
-                        : (hovered && button.Enabled ? RowSelectColor : Color.White);
-                    if (!button.Enabled) fill = Color.FromArgb(236, 234, 228);
                     using (var brush = new SolidBrush(fill))
                         g.FillPath(brush, path);
 
                     if (!primary)
                     {
                         Color border = hovered && button.Enabled ? AccentPrimary : BorderColor;
-                        using (var pen = new Pen(border, 1.1f))
+                        using (var pen = new Pen(border, 1f))
                             g.DrawPath(pen, path);
                     }
                 }
@@ -109,22 +121,23 @@ namespace ClaudeSessionImporter
                 if (hasArrow)
                 {
                     var textRect = new Rectangle(16, 0, Math.Max(10, button.Width - 44), button.Height);
-                    TextRenderer.DrawText(g, cleanText, button.Font, textRect, fg,
+                    DrawSharpText(g, cleanText, button.Font, textRect, fg, fill,
                         TextFormatFlags.VerticalCenter | TextFormatFlags.Left | TextFormatFlags.EndEllipsis);
                     var arrowRect = new Rectangle(Math.Max(0, button.Width - 34), 0, 22, button.Height);
-                    using (var arrowFont = new Font("Microsoft YaHei UI", 11F, FontStyle.Bold))
-                        TextRenderer.DrawText(g, "→", arrowFont, arrowRect, fg,
+                    using (var arrowFont = new Font("Microsoft YaHei UI", 10.5F, FontStyle.Regular))
+                        DrawSharpText(g, "→", arrowFont, arrowRect, fg, fill,
                             TextFormatFlags.VerticalCenter | TextFormatFlags.HorizontalCenter);
                 }
                 else
                 {
-                    TextRenderer.DrawText(g, cleanText, button.Font, button.ClientRectangle, fg,
+                    var innerRect = new Rectangle(8, 0, Math.Max(10, button.Width - 16), button.Height);
+                    DrawSharpText(g, cleanText, button.Font, innerRect, fg, fill,
                         TextFormatFlags.VerticalCenter | TextFormatFlags.HorizontalCenter | TextFormatFlags.EndEllipsis);
                 }
             };
         }
 
-        // GDI+ 抗锯齿圆角工具栏胶囊按钮
+        // GDI+ 抗锯齿圆角工具栏胶囊按钮（不滥用粗体，文字清晰通透）
         private void StyleSecondaryToolButton(Button button, string text, Padding margin, bool isPreviewBadge = false)
         {
             Color clearBg = isPreviewBadge ? CardBg : PaperBg;
@@ -133,7 +146,7 @@ namespace ClaudeSessionImporter
             button.FlatAppearance.BorderSize = 0;
             button.BackColor = clearBg;
             button.ForeColor = InkSub;
-            button.Font = new Font("Microsoft YaHei UI", 8.8F, FontStyle.Regular);
+            button.Font = new Font("Microsoft YaHei UI", 9F, FontStyle.Regular);
             button.Dock = DockStyle.Fill;
             button.Margin = margin;
             button.Cursor = Cursors.Hand;
@@ -149,17 +162,18 @@ namespace ClaudeSessionImporter
                 g.Clear(clearBg);
 
                 bool isSelectedBadge = isPreviewBadge && (button.Text ?? "").Contains("✓");
+                Color fill = isSelectedBadge
+                    ? AccentSoft
+                    : (hovered && button.Enabled ? RowSelectColor : Color.White);
+
                 var rect = new RectangleF(1f, 1f, button.Width - 2.5f, button.Height - 2.5f);
                 using (var path = RoundRect(rect, 7f))
                 {
-                    Color fill = isSelectedBadge
-                        ? AccentSoft
-                        : (hovered && button.Enabled ? RowSelectColor : Color.White);
                     using (var brush = new SolidBrush(fill))
                         g.FillPath(brush, path);
 
                     Color border = isSelectedBadge
-                        ? Color.FromArgb(245, 206, 190)
+                        ? Color.FromArgb(242, 204, 188)
                         : (hovered && button.Enabled ? AccentPrimary : BorderColor);
                     using (var pen = new Pen(border, 1f))
                         g.DrawPath(pen, path);
@@ -168,19 +182,18 @@ namespace ClaudeSessionImporter
                 Color fg = isSelectedBadge
                     ? AccentPrimary
                     : (hovered && button.Enabled ? AccentHover : InkSub);
-                var font = isSelectedBadge ? new Font("Microsoft YaHei UI", 8.5F, FontStyle.Bold) : button.Font;
                 string label = button.Text ?? String.Empty;
-                if (label == "刷新") label = "↻  刷新";
-                TextRenderer.DrawText(g, label, font, button.ClientRectangle, fg,
+                if (label == "刷新") label = "↻ 刷新";
+                var innerRect = new Rectangle(4, 0, Math.Max(8, button.Width - 8), button.Height);
+                DrawSharpText(g, label, button.Font, innerRect, fg, fill,
                     TextFormatFlags.VerticalCenter | TextFormatFlags.HorizontalCenter | TextFormatFlags.EndEllipsis);
-                if (isSelectedBadge) font.Dispose();
             };
         }
 
         [System.Runtime.InteropServices.DllImport("user32.dll", CharSet = System.Runtime.InteropServices.CharSet.Unicode)]
         private static extern IntPtr SendMessage(IntPtr hWnd, int msg, IntPtr wParam, string lParam);
 
-        // 将原生 ComboBox 放入内层 HWND 裁切面板中，物理裁掉原生 2px 灰框与原生右侧按钮，外层自绘圆角框与精致箭头
+        // 将原生 ComboBox 放入内层 HWND 裁切面板中，物理裁掉原生 2px 灰框与原生右侧按钮
         private Panel CreateModernComboContainer(ComboBox combo, bool drawUserBadge, Color parentBg)
         {
             var host = new Panel
@@ -212,19 +225,18 @@ namespace ClaudeSessionImporter
             };
             combo.DrawItem += delegate(object sender, DrawItemEventArgs e)
             {
-                e.DrawBackground();
-                using (var bg = new SolidBrush(
-                    (e.State & DrawItemState.Selected) != 0 && (e.State & DrawItemState.ComboBoxEdit) == 0
-                        ? RowSelectColor : Color.White))
+                Color itemBg = (e.State & DrawItemState.Selected) != 0 && (e.State & DrawItemState.ComboBoxEdit) == 0
+                    ? RowSelectColor : Color.White;
+                using (var bg = new SolidBrush(itemBg))
                 {
                     e.Graphics.FillRectangle(bg, e.Bounds);
                 }
                 if (e.Index >= 0 && e.Index < combo.Items.Count)
                 {
                     string itemText = combo.GetItemText(combo.Items[e.Index]);
-                    TextRenderer.DrawText(e.Graphics, itemText, combo.Font,
+                    DrawSharpText(e.Graphics, itemText, combo.Font,
                         new Rectangle(e.Bounds.X + 2, e.Bounds.Y, e.Bounds.Width - 22, e.Bounds.Height),
-                        Ink, TextFormatFlags.VerticalCenter | TextFormatFlags.Left | TextFormatFlags.EndEllipsis);
+                        Ink, itemBg, TextFormatFlags.VerticalCenter | TextFormatFlags.Left | TextFormatFlags.EndEllipsis);
                 }
             };
             EventHandler toggleDrop = delegate { combo.Focus(); combo.DroppedDown = !combo.DroppedDown; };
@@ -257,14 +269,13 @@ namespace ClaudeSessionImporter
                         g.DrawArc(pPen, badgeRect.X + 4f, badgeRect.Y + 11.2f, 12f, 8f, 180, 180);
                     }
                 }
-                // 右侧自绘现代精致下拉箭头 ⌄
                 float ax = host.Width - 16f, ay = host.Height / 2f - 1.5f;
-                using (var arrowPen = new Pen(Muted, 1.6f) { StartCap = LineCap.Round, EndCap = LineCap.Round, LineJoin = LineJoin.Round })
+                using (var arrowPen = new Pen(Muted, 1.5f) { StartCap = LineCap.Round, EndCap = LineCap.Round, LineJoin = LineJoin.Round })
                 {
                     g.DrawLines(arrowPen, new[] {
-                        new PointF(ax - 4.5f, ay - 1.5f),
-                        new PointF(ax, ay + 3f),
-                        new PointF(ax + 4.5f, ay - 1.5f)
+                        new PointF(ax - 4.2f, ay - 1.5f),
+                        new PointF(ax, ay + 2.8f),
+                        new PointF(ax + 4.2f, ay - 1.5f)
                     });
                 }
             };
@@ -312,7 +323,6 @@ namespace ClaudeSessionImporter
                     g.FillPath(fill, path);
                     g.DrawPath(pen, path);
                 }
-                // 绘制放大镜图标
                 float cx = 15f, cy = host.Height / 2f - 1f;
                 using (var iconPen = new Pen(Muted, 1.5f) { StartCap = LineCap.Round, EndCap = LineCap.Round })
                 {
@@ -341,7 +351,6 @@ namespace ClaudeSessionImporter
             ForeColor = Ink;
             StartPosition = FormStartPosition.CenterScreen;
 
-            // 根网格布局：左侧边栏 (302px) + 右工作区 (自适应)
             var root = new TableLayoutPanel
             {
                 Dock = DockStyle.Fill,
@@ -350,11 +359,11 @@ namespace ClaudeSessionImporter
                 Margin = new Padding(0),
                 BackColor = PaperBg
             };
-            root.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 302F));
+            root.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 300F));
             root.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100F));
             Controls.Add(root);
 
-            // ==================== 1. 侧边栏容器（对标参考图：浅燕麦底 + 橙色星芒徽标 + 圆角步骤圈） ====================
+            // ==================== 1. 侧边栏容器 ====================
             var sidebar = new Panel
             {
                 Dock = DockStyle.Fill,
@@ -372,50 +381,48 @@ namespace ClaudeSessionImporter
             var sidebarLayout = new TableLayoutPanel
             {
                 Dock = DockStyle.Fill,
-                BackColor = Color.Transparent,
+                BackColor = SidebarBg,
                 ColumnCount = 1,
                 RowCount = 5,
                 Margin = new Padding(0)
             };
-            sidebarLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 96F));
+            sidebarLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 76F));
             sidebarLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 246F));
             sidebarLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 148F));
             sidebarLayout.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
-            sidebarLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 138F));
+            sidebarLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 136F));
             sidebar.Controls.Add(sidebarLayout);
 
-            // 1.1 品牌头（自绘 44x44 Claude 星芒圆角徽标 + 标题 + 副标题）
-            var brandPanel = new Panel { Dock = DockStyle.Fill, Margin = new Padding(0) };
+            // 1.1 品牌头（去掉繁杂大写英文眉标，42x42 珊瑚橙星芒徽标 + 清爽主副标题）
+            var brandPanel = new Panel { Dock = DockStyle.Fill, BackColor = SidebarBg, Margin = new Padding(0) };
             brandPanel.Paint += delegate(object sender, PaintEventArgs e)
             {
                 var g = e.Graphics;
                 g.SmoothingMode = SmoothingMode.AntiAlias;
                 g.TextRenderingHint = TextRenderingHint.ClearTypeGridFit;
+                g.Clear(SidebarBg);
 
-                // 左侧 44x44 珊瑚橙圆角方块 + 白色星芒
-                var logoRect = new RectangleF(0f, 4f, 44f, 44f);
-                using (var path = RoundRect(logoRect, 11f))
+                var logoRect = new RectangleF(0f, 4f, 42f, 42f);
+                using (var path = RoundRect(logoRect, 10f))
                 using (var brush = new SolidBrush(AccentPrimary))
                     g.FillPath(brush, path);
 
-                float cx = 22f, cy = 26f;
-                using (var sparkPen = new Pen(Color.White, 2.2f) { StartCap = LineCap.Round, EndCap = LineCap.Round })
+                float cx = 21f, cy = 25f;
+                using (var sparkPen = new Pen(Color.White, 2.1f) { StartCap = LineCap.Round, EndCap = LineCap.Round })
                 {
                     for (int i = 0; i < 6; i++)
                     {
                         double a = i * Math.PI / 3.0 + 0.22;
-                        g.DrawLine(sparkPen, cx - (float)Math.Cos(a) * 11f, cy - (float)Math.Sin(a) * 11f,
-                            cx + (float)Math.Cos(a) * 11f, cy + (float)Math.Sin(a) * 11f);
+                        g.DrawLine(sparkPen, cx - (float)Math.Cos(a) * 10.5f, cy - (float)Math.Sin(a) * 10.5f,
+                            cx + (float)Math.Cos(a) * 10.5f, cy + (float)Math.Sin(a) * 10.5f);
                     }
                 }
 
-                using (var tagFont = new Font("Microsoft YaHei UI", 8F, FontStyle.Bold))
-                using (var titleFont = new Font("Microsoft YaHei UI", 21F, FontStyle.Bold))
-                using (var subFont = new Font("Microsoft YaHei UI", 9.2F, FontStyle.Regular))
+                using (var titleFont = new Font("Microsoft YaHei UI", 17.5F, FontStyle.Bold))
+                using (var subFont = new Font("Microsoft YaHei UI", 9F, FontStyle.Regular))
                 {
-                    TextRenderer.DrawText(g, "CLAUDE CONTINUITY", tagFont, new Point(54, 3), AccentPrimary);
-                    TextRenderer.DrawText(g, "Continuity", titleFont, new Point(52, 17), Ink);
-                    TextRenderer.DrawText(g, "换个账号，无缝继续手头工作。", subFont, new Point(0, 62), Muted);
+                    DrawSharpTextAt(g, "Continuity", titleFont, new Point(52, 1), Ink, SidebarBg);
+                    DrawSharpTextAt(g, "换个账号，无缝继续手头工作", subFont, new Point(54, 33), Muted, SidebarBg);
                 }
             };
             sidebarLayout.Controls.Add(brandPanel, 0, 0);
@@ -424,6 +431,7 @@ namespace ClaudeSessionImporter
             var actionCard = new TableLayoutPanel
             {
                 Dock = DockStyle.Fill,
+                BackColor = SidebarBg,
                 ColumnCount = 1,
                 RowCount = 5,
                 Margin = new Padding(0, 4, 0, 6),
@@ -435,7 +443,7 @@ namespace ClaudeSessionImporter
             actionCard.RowStyles.Add(new RowStyle(SizeType.Absolute, 52F));
             actionCard.RowStyles.Add(new RowStyle(SizeType.Absolute, 48F));
 
-            actionCard.Controls.Add(LabelAt("当前 / 目标账号", 9.2F, InkSub, FontStyle.Bold), 0, 0);
+            actionCard.Controls.Add(LabelAt("当前 / 目标账号", 9F, InkSub, FontStyle.Regular), 0, 0);
 
             accounts.DropDownStyle = ComboBoxStyle.DropDownList;
             accounts.AccessibleName = "选择目标账号";
@@ -445,7 +453,7 @@ namespace ClaudeSessionImporter
             mode.ForeColor = Muted;
             mode.Dock = DockStyle.Fill;
             mode.AutoEllipsis = true;
-            mode.Font = new Font("Microsoft YaHei UI", 8.3F);
+            mode.Font = new Font("Microsoft YaHei UI", 8.5F);
             mode.Padding = new Padding(2, 2, 0, 4);
             actionCard.Controls.Add(mode, 0, 2);
 
@@ -458,11 +466,11 @@ namespace ClaudeSessionImporter
 
             sidebarLayout.Controls.Add(actionCard, 0, 1);
 
-            // 1.3 快速上手（对标参考图：⚡ 快速上手 + 01/02/03 浅珊瑚橙圆形徽章）
+            // 1.3 快速上手
             var guideBox = new Panel
             {
                 Dock = DockStyle.Fill,
-                BackColor = Color.Transparent,
+                BackColor = SidebarBg,
                 Margin = new Padding(0, 8, 0, 4)
             };
             guideBox.Paint += delegate(object sender, PaintEventArgs e)
@@ -470,15 +478,16 @@ namespace ClaudeSessionImporter
                 var g = e.Graphics;
                 g.SmoothingMode = SmoothingMode.AntiAlias;
                 g.TextRenderingHint = TextRenderingHint.ClearTypeGridFit;
+                g.Clear(SidebarBg);
 
                 using (var linePen = new Pen(SidebarBorder, 1f))
                     g.DrawLine(linePen, 0, 2, guideBox.Width, 2);
 
-                using (var headFont = new Font("Microsoft YaHei UI", 9.2F, FontStyle.Bold))
-                using (var numFont = new Font("Microsoft YaHei UI", 7.8F, FontStyle.Bold))
+                using (var headFont = new Font("Microsoft YaHei UI", 9F, FontStyle.Bold))
+                using (var numFont = new Font("Microsoft YaHei UI", 8F, FontStyle.Regular))
                 using (var stepFont = new Font("Microsoft YaHei UI", 8.8F, FontStyle.Regular))
                 {
-                    TextRenderer.DrawText(g, "⚡  快速上手", headFont, new Point(0, 14), Ink);
+                    DrawSharpTextAt(g, "快速上手", headFont, new Point(0, 14), InkSub, SidebarBg);
 
                     string[] nums = { "01", "02", "03" };
                     string[] steps = {
@@ -494,9 +503,9 @@ namespace ClaudeSessionImporter
                         using (var bBrush = new SolidBrush(AccentSoft))
                             g.FillPath(bBrush, path);
 
-                        TextRenderer.DrawText(g, nums[i], numFont, Rectangle.Round(pill), AccentPrimary,
+                        DrawSharpText(g, nums[i], numFont, Rectangle.Round(pill), AccentPrimary, AccentSoft,
                             TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter);
-                        TextRenderer.DrawText(g, steps[i], stepFont, new Point(34, (int)y + 1), InkSub);
+                        DrawSharpTextAt(g, steps[i], stepFont, new Point(34, (int)y + 1), InkSub, SidebarBg);
                     }
                 }
             };
@@ -506,6 +515,7 @@ namespace ClaudeSessionImporter
             var lowerBox = new TableLayoutPanel
             {
                 Dock = DockStyle.Fill,
+                BackColor = SidebarBg,
                 ColumnCount = 1,
                 RowCount = 3,
                 Margin = new Padding(0)
@@ -514,11 +524,11 @@ namespace ClaudeSessionImporter
             lowerBox.RowStyles.Add(new RowStyle(SizeType.Absolute, 26F));
             lowerBox.RowStyles.Add(new RowStyle(SizeType.Absolute, 52F));
 
-            StyleButton(manage, "＋  添加账号 / 备份…", false);
+            StyleButton(manage, "＋ 添加账号 / 备份…", false);
             lowerBox.Controls.Add(manage, 0, 0);
 
-            lowerBox.Controls.Add(LabelAt("通过附带账号管理器管理凭据", 8F, Muted, FontStyle.Regular), 0, 1);
-            lowerBox.Controls.Add(LabelAt("ⓘ 跨账号切换会自动重启 Claude Desktop。\n     同账号直接唤醒不会重启。", 8F, Muted, FontStyle.Regular), 0, 2);
+            lowerBox.Controls.Add(LabelAt("通过附带账号管理器管理凭据", 8.2F, Muted, FontStyle.Regular), 0, 1);
+            lowerBox.Controls.Add(LabelAt("跨账号切换会自动重启 Claude Desktop；\n同账号直接唤醒不会重启。", 8.2F, Muted, FontStyle.Regular), 0, 2);
 
             sidebarLayout.Controls.Add(lowerBox, 0, 4);
 
@@ -526,41 +536,41 @@ namespace ClaudeSessionImporter
             var workspace = new TableLayoutPanel
             {
                 Dock = DockStyle.Fill,
-                Padding = new Padding(32, 24, 32, 18),
+                Padding = new Padding(32, 22, 32, 18),
                 RowCount = 4,
                 ColumnCount = 1,
                 BackColor = PaperBg,
                 Margin = new Padding(0)
             };
-            workspace.RowStyles.Add(new RowStyle(SizeType.Absolute, 90F));
+            workspace.RowStyles.Add(new RowStyle(SizeType.Absolute, 68F));
             workspace.RowStyles.Add(new RowStyle(SizeType.Absolute, 66F));
             workspace.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
-            workspace.RowStyles.Add(new RowStyle(SizeType.Absolute, 38F));
+            workspace.RowStyles.Add(new RowStyle(SizeType.Absolute, 36F));
             root.Controls.Add(workspace, 1, 0);
 
-            // 2.1 顶部大标题与说明
+            // 2.1 顶部标题与说明（去掉刺眼的大写英文眉标，减法排版，清爽舒适）
             var header = new TableLayoutPanel
             {
                 Dock = DockStyle.Fill,
-                RowCount = 3,
+                BackColor = PaperBg,
+                RowCount = 2,
                 ColumnCount = 1,
                 Margin = new Padding(0)
             };
-            header.RowStyles.Add(new RowStyle(SizeType.Absolute, 22F));
-            header.RowStyles.Add(new RowStyle(SizeType.Absolute, 42F));
-            header.RowStyles.Add(new RowStyle(SizeType.Absolute, 24F));
-            header.Controls.Add(LabelAt("SESSION CONTINUITY LIBRARY  /  本地会话工作区", 8.8F, AccentPrimary, FontStyle.Bold), 0, 0);
-            header.Controls.Add(LabelAt("从上次停下的地方继续", 21.5F, Ink, FontStyle.Bold), 0, 1);
-            header.Controls.Add(LabelAt("最近 " + settings.activeSessionHours + " 小时内有新对话的会话已预先勾选。点击任意行，可在右侧查阅历史记录。", 9.2F, Muted, FontStyle.Regular), 0, 2);
+            header.RowStyles.Add(new RowStyle(SizeType.Absolute, 36F));
+            header.RowStyles.Add(new RowStyle(SizeType.Absolute, 26F));
+            header.Controls.Add(LabelAt("从上次停下的地方继续", 17.5F, Ink, FontStyle.Bold), 0, 0);
+            header.Controls.Add(LabelAt("最近 " + settings.activeSessionHours + " 小时内有新对话的会话已预先勾选 · 点击任意行可在右侧查阅历史对话", 9.2F, Muted, FontStyle.Regular), 0, 1);
             workspace.Controls.Add(header, 0, 0);
 
-            // 2.2 筛选栏与快捷勾选操作（圆角下拉框 + 带放大镜圆角搜索框 + 圆角胶囊按钮）
+            // 2.2 筛选栏与快捷勾选操作（标签不加粗，柔和清爽）
             var filters = new TableLayoutPanel
             {
                 Dock = DockStyle.Fill,
+                BackColor = PaperBg,
                 ColumnCount = 5,
                 RowCount = 2,
-                Padding = new Padding(0, 0, 0, 8),
+                Padding = new Padding(0, 2, 0, 8),
                 Margin = new Padding(0)
             };
             filters.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 245F));
@@ -571,9 +581,9 @@ namespace ClaudeSessionImporter
             filters.RowStyles.Add(new RowStyle(SizeType.Absolute, 20F));
             filters.RowStyles.Add(new RowStyle(SizeType.Absolute, 36F));
 
-            filters.Controls.Add(LabelAt("项目目录", 8.8F, Muted, FontStyle.Bold), 0, 0);
-            filters.Controls.Add(LabelAt("搜索会话标题、ID 或项目名称", 8.8F, Muted, FontStyle.Bold), 1, 0);
-            var quickSelectLabel = LabelAt("快捷勾选", 8.8F, Muted, FontStyle.Bold);
+            filters.Controls.Add(LabelAt("项目目录", 8.8F, Muted, FontStyle.Regular), 0, 0);
+            filters.Controls.Add(LabelAt("搜索会话", 8.8F, Muted, FontStyle.Regular), 1, 0);
+            var quickSelectLabel = LabelAt("快捷勾选", 8.8F, Muted, FontStyle.Regular);
             filters.Controls.Add(quickSelectLabel, 2, 0);
             filters.SetColumnSpan(quickSelectLabel, 2);
 
@@ -616,7 +626,7 @@ namespace ClaudeSessionImporter
             };
             workspace.Controls.Add(content, 0, 2);
 
-            // 2.3.1 会话表格配置（对标参考图：自绘珊瑚橙圆角复选框 + 文档小图标 + 绿色/暖橙状态胶囊 Pill Badge）
+            // 2.3.1 会话表格配置
             grid.Dock = DockStyle.Fill;
             grid.AllowUserToAddRows = false;
             grid.AllowUserToDeleteRows = false;
@@ -636,7 +646,7 @@ namespace ClaudeSessionImporter
             {
                 BackColor = TableHeaderBg,
                 ForeColor = Muted,
-                Font = new Font("Microsoft YaHei UI", 8.8F, FontStyle.Bold),
+                Font = new Font("Microsoft YaHei UI", 9F, FontStyle.Regular),
                 Padding = new Padding(8, 0, 8, 0)
             };
             grid.DefaultCellStyle = new DataGridViewCellStyle
@@ -645,7 +655,7 @@ namespace ClaudeSessionImporter
                 ForeColor = Ink,
                 SelectionBackColor = RowSelectColor,
                 SelectionForeColor = Ink,
-                Font = new Font("Microsoft YaHei UI", 9.2F),
+                Font = new Font("Microsoft YaHei UI", 9.5F, FontStyle.Regular),
                 Padding = new Padding(8, 6, 8, 6)
             };
             grid.AlternatingRowsDefaultCellStyle.BackColor = Color.FromArgb(253, 252, 249);
@@ -671,7 +681,7 @@ namespace ClaudeSessionImporter
             grid.Columns["Input"].Visible = false;
             grid.AccessibleName = "本地会话列表";
 
-            // 自绘表格单元格：珊瑚橙圆角勾选框 + 会话类型图标 + 绿色/暖橙圆角状态胶囊
+            // 自绘表格单元格：显式传入背景色以启用原生 ClearType 亚像素清晰度，且中文标题与胶囊不滥用 Bold 防止笔画糊成一团
             grid.CellPainting += delegate(object sender, DataGridViewCellPaintingEventArgs e)
             {
                 if (e.ColumnIndex < 0) return;
@@ -680,14 +690,13 @@ namespace ClaudeSessionImporter
                 g.TextRenderingHint = TextRenderingHint.ClearTypeGridFit;
                 string colName = grid.Columns[e.ColumnIndex].Name;
 
-                // 表头第一列绘制占位复选框装饰
                 if (e.RowIndex == -1 && colName == "Choose")
                 {
                     e.PaintBackground(e.ClipBounds, false);
                     var box = new RectangleF(e.CellBounds.X + (e.CellBounds.Width - 16f) / 2f,
                         e.CellBounds.Y + (e.CellBounds.Height - 16f) / 2f, 16f, 16f);
                     using (var path = RoundRect(box, 4f))
-                    using (var pen = new Pen(Color.FromArgb(195, 191, 182), 1.3f))
+                    using (var pen = new Pen(Color.FromArgb(195, 191, 182), 1.2f))
                         g.DrawPath(pen, path);
                     e.Handled = true;
                     return;
@@ -729,7 +738,7 @@ namespace ClaudeSessionImporter
                         {
                             using (var fill = new SolidBrush(Color.White))
                                 g.FillPath(fill, path);
-                            using (var pen = new Pen(Color.FromArgb(196, 192, 183), 1.3f))
+                            using (var pen = new Pen(Color.FromArgb(196, 192, 183), 1.2f))
                                 g.DrawPath(pen, path);
                         }
                     }
@@ -739,26 +748,24 @@ namespace ClaudeSessionImporter
                 {
                     string titleText = Convert.ToString(e.FormattedValue) ?? String.Empty;
                     float iconX = e.CellBounds.X + 8f;
-                    float iconY = e.CellBounds.Y + (e.CellBounds.Height - 20f) / 2f;
-                    var iconRect = new RectangleF(iconX, iconY, 18f, 20f);
+                    float iconY = e.CellBounds.Y + (e.CellBounds.Height - 19f) / 2f;
+                    var iconRect = new RectangleF(iconX, iconY, 17f, 19f);
                     bool isDocStyle = isCheckedRow || titleText.IndexOf("fork", StringComparison.OrdinalIgnoreCase) >= 0;
 
                     using (var iconPath = RoundRect(iconRect, 4f))
-                    using (var iconBg = new SolidBrush(isDocStyle ? AccentSoft : Color.FromArgb(241, 239, 234)))
-                    using (var iconPen = new Pen(isDocStyle ? AccentPrimary : InkSub, 1.3f))
+                    using (var iconBg = new SolidBrush(isDocStyle ? AccentSoft : Color.FromArgb(242, 240, 235)))
+                    using (var iconPen = new Pen(isDocStyle ? AccentPrimary : Muted, 1.2f))
                     {
                         g.FillPath(iconBg, iconPath);
                         g.DrawPath(iconPen, iconPath);
-                        g.DrawLine(iconPen, iconX + 4.5f, iconY + 6.5f, iconX + 13.5f, iconY + 6.5f);
-                        g.DrawLine(iconPen, iconX + 4.5f, iconY + 10.5f, iconX + 13.5f, iconY + 10.5f);
-                        g.DrawLine(iconPen, iconX + 4.5f, iconY + 14.5f, iconX + 10.5f, iconY + 14.5f);
+                        g.DrawLine(iconPen, iconX + 4.2f, iconY + 6.2f, iconX + 12.8f, iconY + 6.2f);
+                        g.DrawLine(iconPen, iconX + 4.2f, iconY + 10.0f, iconX + 12.8f, iconY + 10.0f);
+                        g.DrawLine(iconPen, iconX + 4.2f, iconY + 13.8f, iconX + 9.8f, iconY + 13.8f);
                     }
 
                     var textBounds = new Rectangle(e.CellBounds.X + 34, e.CellBounds.Y, e.CellBounds.Width - 42, e.CellBounds.Height);
-                    var font = isCheckedRow ? new Font(e.CellStyle.Font, FontStyle.Bold) : e.CellStyle.Font;
-                    TextRenderer.DrawText(g, titleText, font, textBounds, Ink,
+                    DrawSharpText(g, titleText, e.CellStyle.Font, textBounds, isCheckedRow ? Ink : InkSub, rowBg,
                         TextFormatFlags.VerticalCenter | TextFormatFlags.Left | TextFormatFlags.EndEllipsis);
-                    if (isCheckedRow) font.Dispose();
                     e.Handled = true;
                 }
                 else if (colName == "Registered")
@@ -770,10 +777,10 @@ namespace ClaudeSessionImporter
                     Color pillBg = isMissing ? PillGrayBg : (isReg ? PillGreenBg : PillAmberBg);
                     Color pillFg = isMissing ? PillGrayFg : (isReg ? PillGreenFg : PillAmberFg);
 
-                    using (var badgeFont = new Font("Microsoft YaHei UI", 8.2F, FontStyle.Bold))
+                    using (var badgeFont = new Font("Microsoft YaHei UI", 8.5F, FontStyle.Regular))
                     {
                         Size textSz = TextRenderer.MeasureText(g, stateText, badgeFont);
-                        float pillW = Math.Min(e.CellBounds.Width - 12f, textSz.Width + 16f);
+                        float pillW = Math.Min(e.CellBounds.Width - 12f, textSz.Width + 14f);
                         float pillH = 24f;
                         float pillX = e.CellBounds.X + 6f;
                         float pillY = e.CellBounds.Y + (e.CellBounds.Height - pillH) / 2f;
@@ -783,7 +790,7 @@ namespace ClaudeSessionImporter
                         using (var fill = new SolidBrush(pillBg))
                             g.FillPath(fill, path);
 
-                        TextRenderer.DrawText(g, stateText, badgeFont, Rectangle.Round(pillRect), pillFg,
+                        DrawSharpText(g, stateText, badgeFont, Rectangle.Round(pillRect), pillFg, pillBg,
                             TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis);
                     }
                     e.Handled = true;
@@ -792,7 +799,7 @@ namespace ClaudeSessionImporter
                 {
                     string val = Convert.ToString(e.FormattedValue) ?? String.Empty;
                     var textBounds = new Rectangle(e.CellBounds.X + 8, e.CellBounds.Y, e.CellBounds.Width - 16, e.CellBounds.Height);
-                    TextRenderer.DrawText(g, val, e.CellStyle.Font, textBounds, InkSub,
+                    DrawSharpText(g, val, e.CellStyle.Font, textBounds, Muted, rowBg,
                         TextFormatFlags.VerticalCenter | TextFormatFlags.Left | TextFormatFlags.EndEllipsis);
                     e.Handled = true;
                 }
@@ -835,7 +842,7 @@ namespace ClaudeSessionImporter
                     e.Graphics.DrawPath(pen, path);
             };
             previewLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 32F));
-            previewLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 68F));
+            previewLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 58F));
             previewLayout.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
             previewLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 26F));
             content.Panel2.Controls.Add(previewLayout);
@@ -843,32 +850,34 @@ namespace ClaudeSessionImporter
             var previewTopBar = new TableLayoutPanel
             {
                 Dock = DockStyle.Fill,
+                BackColor = CardBg,
                 ColumnCount = 2,
                 RowCount = 1,
                 Margin = new Padding(0)
             };
             previewTopBar.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100F));
-            previewTopBar.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 116F));
+            previewTopBar.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 114F));
             previewTopBar.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
 
-            var previewBadgeHeader = new Panel { Dock = DockStyle.Fill, Margin = new Padding(0) };
+            var previewBadgeHeader = new Panel { Dock = DockStyle.Fill, BackColor = CardBg, Margin = new Padding(0) };
             previewBadgeHeader.Paint += delegate(object sender, PaintEventArgs e)
             {
                 var g = e.Graphics;
                 g.SmoothingMode = SmoothingMode.AntiAlias;
                 g.TextRenderingHint = TextRenderingHint.ClearTypeGridFit;
-                var iconBox = new RectangleF(0f, 3f, 22f, 22f);
+                g.Clear(CardBg);
+                var iconBox = new RectangleF(0f, 4f, 20f, 20f);
                 using (var path = RoundRect(iconBox, 5f))
-                using (var brush = new SolidBrush(AccentPrimary))
+                using (var brush = new SolidBrush(AccentSoft))
                     g.FillPath(brush, path);
-                using (var pen = new Pen(Color.White, 1.4f))
+                using (var pen = new Pen(AccentPrimary, 1.3f))
                 {
-                    g.DrawLine(pen, 5.5f, 9.5f, 16.5f, 9.5f);
-                    g.DrawLine(pen, 5.5f, 13.5f, 16.5f, 13.5f);
-                    g.DrawLine(pen, 5.5f, 17.5f, 12.5f, 17.5f);
+                    g.DrawLine(pen, 5f, 9f, 15f, 9f);
+                    g.DrawLine(pen, 5f, 13f, 15f, 13f);
+                    g.DrawLine(pen, 5f, 17f, 11f, 17f);
                 }
-                using (var f = new Font("Microsoft YaHei UI", 8.1F, FontStyle.Bold))
-                    TextRenderer.DrawText(g, "CONVERSATION TRANSCRIPT / 最近对话预览", f, new Point(28, 5), AccentPrimary);
+                using (var f = new Font("Microsoft YaHei UI", 9.2F, FontStyle.Bold))
+                    DrawSharpTextAt(g, "最近对话预览", f, new Point(26, 4), InkSub, CardBg);
             };
             previewTopBar.Controls.Add(previewBadgeHeader, 0, 0);
 
@@ -877,12 +886,55 @@ namespace ClaudeSessionImporter
             previewTopBar.Controls.Add(togglePreviewed, 1, 0);
             previewLayout.Controls.Add(previewTopBar, 0, 0);
 
+            // 自绘 previewHeading：底层保留 "最近对话 · 标题 · ID · 条数" 供集成测试校验，视觉上拆分为“主标题 + 浅灰元信息”两行清爽排版
             previewHeading.Dock = DockStyle.Fill;
+            previewHeading.BackColor = CardBg;
             previewHeading.ForeColor = Ink;
-            previewHeading.Font = new Font("Microsoft YaHei UI", 9.8F, FontStyle.Bold);
+            previewHeading.Font = new Font("Microsoft YaHei UI", 9.5F, FontStyle.Regular);
             previewHeading.AutoEllipsis = true;
-            previewHeading.Text = "点选一条会话\n在此处查看对话上下文与执行进度。";
+            previewHeading.Text = "点选一条会话，在此处查看对话上下文与执行进度。";
             previewHeading.Margin = new Padding(0);
+            previewHeading.Paint += delegate(object sender, PaintEventArgs e)
+            {
+                var g = e.Graphics;
+                g.SmoothingMode = SmoothingMode.AntiAlias;
+                g.TextRenderingHint = TextRenderingHint.ClearTypeGridFit;
+                g.Clear(CardBg);
+
+                string raw = previewHeading.Text ?? String.Empty;
+                string mainLine = raw;
+                string subLine = String.Empty;
+
+                if (raw.StartsWith("最近对话 · "))
+                {
+                    string rest = raw.Substring("最近对话 · ".Length);
+                    string[] parts = rest.Split(new[] { " · " }, StringSplitOptions.None);
+                    if (parts.Length >= 2)
+                    {
+                        mainLine = parts[0];
+                        subLine = "会话 ID: " + String.Join("  ·  ", parts, 1, parts.Length - 1);
+                    }
+                }
+
+                using (var titleFont = new Font("Microsoft YaHei UI", 10.5F, FontStyle.Bold))
+                using (var metaFont = new Font("Microsoft YaHei UI", 8.6F, FontStyle.Regular))
+                {
+                    if (subLine.Length > 0)
+                    {
+                        DrawSharpText(g, mainLine, titleFont, new Rectangle(0, 4, previewHeading.Width, 24), Ink, CardBg,
+                            TextFormatFlags.Left | TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis);
+                        DrawSharpText(g, subLine, metaFont, new Rectangle(0, 30, previewHeading.Width, 20), Muted, CardBg,
+                            TextFormatFlags.Left | TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis);
+                    }
+                    else
+                    {
+                        DrawSharpText(g, mainLine, metaFont, new Rectangle(0, 6, previewHeading.Width, 40), Muted, CardBg,
+                            TextFormatFlags.Left | TextFormatFlags.VerticalCenter | TextFormatFlags.WordBreak);
+                    }
+                }
+                using (var linePen = new Pen(Color.FromArgb(242, 240, 234), 1f))
+                    g.DrawLine(linePen, 0, previewHeading.Height - 2, previewHeading.Width, previewHeading.Height - 2);
+            };
             previewLayout.Controls.Add(previewHeading, 0, 1);
 
             preview.Dock = DockStyle.Fill;
@@ -893,17 +945,17 @@ namespace ClaudeSessionImporter
             preview.BackColor = CardBg;
             preview.ScrollBars = RichTextBoxScrollBars.Vertical;
             preview.AccessibleName = "最近对话预览";
-            preview.Font = new Font("Microsoft YaHei UI", 9.2F);
-            preview.Margin = new Padding(0, 4, 0, 4);
+            preview.Font = new Font("Microsoft YaHei UI", 9.5F);
+            preview.Margin = new Padding(0, 6, 0, 4);
             previewLayout.Controls.Add(preview, 0, 2);
 
-            previewLayout.Controls.Add(LabelAt("ⓘ 只读预览 · 本地安全解析 · 不改写原始会话记录", 8F, Muted, FontStyle.Regular), 0, 3);
+            previewLayout.Controls.Add(LabelAt("只读预览 · 本地安全解析 · 不改写原始会话记录", 8.2F, Muted, FontStyle.Regular), 0, 3);
 
             // 2.4 状态栏
             var statusPanel = new Panel
             {
                 Dock = DockStyle.Fill,
-                BackColor = Color.Transparent,
+                BackColor = PaperBg,
                 Margin = new Padding(0)
             };
             status.Dock = DockStyle.Fill;
