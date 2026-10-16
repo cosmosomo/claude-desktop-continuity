@@ -63,6 +63,8 @@ public static class LocalIntegrationTests
             Check(state.accounts.Count > 0, "read real saved accounts through credential-free JSON protocol");
             Check(state.accounts.Select(account => account.name).Distinct().Count() == state.accounts.Count, "account identities have unique names");
             var sessions = catalog.Scan(); Check(sessions.Count > 1, "discover real local transcripts without a predefined session ID");
+            Check(Catalog.EnumerateLogCandidates(settings.officialLogPath).Any(), "enumerate primary and rotated desktop log files");
+            Check(catalog.OfficialIdentity != null && Catalog.IsSessionId(catalog.OfficialIdentity.OrgId), "resolve desktop identity across log rotation and disk session folders");
             Check(sessions.Zip(sessions.Skip(1), (a, b) => a.ModifiedUtc >= b.ModifiedUtc).All(value => value), "sort recent modifications descending");
             Check(sessions.All(session => !session.Path.Contains("\\subagents\\")), "exclude subagent JSONLs");
             var sessionWithText = sessions.Where(session => session.ModifiedUtc < DateTime.UtcNow.AddHours(-1) && Directory.Exists(session.Cwd))

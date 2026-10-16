@@ -177,31 +177,111 @@ namespace ClaudeSessionImporter
             if (!official && String.IsNullOrWhiteSpace(settings.gatewayDesktopRoot)) throw new IOException("当前为 Gateway 模式，但未配置 Gateway 数据路径。");
             string root = official ? settings.officialDesktopRoot : settings.gatewayDesktopRoot;
             string logPath = official ? settings.officialLogPath : settings.gatewayLogPath;
-            var config = Json.Read<Dictionary<string, object>>(Path.Combine(root, "config.json"));
+            string configPath = Path.Combine(root, "config.json");
+            if (!File.Exists(configPath))
+                throw new IOException("Desktop 配置文件不存在：" + configPath + "。请先启动并登录 Claude Desktop。");
+            var config = Json.Read<Dictionary<string, object>>(configPath);
             object account;
-            if (!config.TryGetValue("lastKnownAccountUuid", out account) || !(account is string) || !IsSessionId((string)account))
+            if (config == null || !config.TryGetValue("lastKnownAccountUuid", out account) || !(account is string) || !IsSessionId((string)account))
                 throw new IOException("Desktop 尚未记录有效登录账号：" + root + "。请先登录并打开 Code 页面。");
+            string activeAccount = (string)account;
 
-            // 组织由 Desktop 自身的初始化日志确认，避免误选其他账号或旧组织目录。
-            Match initialized = null;
-            var pattern = new Regex(@"\[LocalSessionManager\] Initialization succeeded.*accountId=([0-9a-fA-F-]{36}), orgId=([0-9a-fA-F-]{36})(?:,|\s|$)");
-            using (var stream = new FileStream(logPath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete))
-            using (var reader = new StreamReader(stream, new UTF8Encoding(false, true)))
+            // 优先从当前日志与轮转日志（main.log / main1.log ...）读取该账号的组织 ID；若日志已被轮转覆盖，则回退检查磁盘已有会话索引目录。
+            string orgId = ResolveOrgFromLogs(logPath, activeAccount) ?? ResolveOrgFromDisk(root, activeAccount);
+            if (String.IsNullOrWhiteSpace(orgId) || !IsSessionId(orgId))
+                throw new IOException("Desktop 尚未生成当前账号的 Code 会话目录：" + logPath + "。请先打开 Code 页面后刷新列表。");
+            return new DesktopIdentity { AccountId = activeAccount, OrgId = orgId,
+                IndexRoot = Path.Combine(root, "claude-code-sessions", activeAccount, orgId) };
+        }
+
+        public DesktopIdentity TryResolveIdentity(string provider, out string pendingReason)
+        {
+            try
             {
-                string line;
-                while ((line = reader.ReadLine()) != null)
+                pendingReason = null;
+                return ResolveIdentity(provider);
+            }
+            catch (IOException ex)
+            {
+                pendingReason = ex.Message;
+                return null;
+            }
+        }
+
+        public static IEnumerable<string> EnumerateLogCandidates(string primaryLogPath)
+        {
+            if (String.IsNullOrWhiteSpace(primaryLogPath)) yield break;
+            if (File.Exists(primaryLogPath)) yield return primaryLogPath;
+            string dir = Path.GetDirectoryName(primaryLogPath);
+            string baseName = Path.GetFileNameWithoutExtension(primaryLogPath);
+            string ext = Path.GetExtension(primaryLogPath);
+            if (String.IsNullOrWhiteSpace(dir) || !Directory.Exists(dir)) yield break;
+            var rotated = new DirectoryInfo(dir).EnumerateFiles(baseName + "*" + ext, SearchOption.TopDirectoryOnly)
+                .Where(f => !String.Equals(f.FullName, primaryLogPath, StringComparison.OrdinalIgnoreCase))
+                .Where(f =>
                 {
-                    var match = pattern.Match(line);
-                    if (match.Success) initialized = match;
+                    string suffix = Path.GetFileNameWithoutExtension(f.Name).Substring(baseName.Length);
+                    return suffix.Length > 0 && (suffix.All(Char.IsDigit) || String.Equals(suffix, ".old", StringComparison.OrdinalIgnoreCase));
+                })
+                .OrderByDescending(f => f.LastWriteTimeUtc)
+                .Select(f => f.FullName);
+            foreach (var path in rotated) yield return path;
+        }
+
+        private string ResolveOrgFromLogs(string logPath, string activeAccount)
+        {
+            var pattern = new Regex(@"\[LocalSessionManager\] Initialization succeeded.*accountId=([0-9a-fA-F-]{36}), orgId=([0-9a-fA-F-]{36})(?:,|\s|$)");
+            foreach (var candidateLog in EnumerateLogCandidates(logPath))
+            {
+                try
+                {
+                    Match lastMatchForAccount = null;
+                    using (var stream = new FileStream(candidateLog, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete))
+                    using (var reader = new StreamReader(stream, new UTF8Encoding(false, false)))
+                    {
+                        string line;
+                        while ((line = reader.ReadLine()) != null)
+                        {
+                            var match = pattern.Match(line);
+                            if (match.Success && String.Equals(match.Groups[1].Value, activeAccount, StringComparison.OrdinalIgnoreCase) && IsSessionId(match.Groups[2].Value))
+                                lastMatchForAccount = match;
+                        }
+                    }
+                    if (lastMatchForAccount != null)
+                    {
+                        string orgId = lastMatchForAccount.Groups[2].Value;
+                        if (!String.Equals(candidateLog, logPath, StringComparison.OrdinalIgnoreCase))
+                            log.Write("desktop_identity_from_rotated_log", "log=" + Path.GetFileName(candidateLog) + ";account=" + activeAccount + ";org=" + orgId);
+                        return orgId;
+                    }
+                }
+                catch (IOException ex)
+                {
+                    log.Write("log_candidate_read_skipped", "log=" + candidateLog + ";" + ex.Message);
                 }
             }
-            if (initialized == null || !IsSessionId(initialized.Groups[2].Value))
-                throw new IOException("Desktop 日志中没有 Code 会话初始化记录：" + logPath + "。请先打开 Code 页面后刷新列表。");
-            string activeAccount = initialized.Groups[1].Value;
-            if (!String.Equals((string)account, activeAccount, StringComparison.OrdinalIgnoreCase))
-                throw new IOException("Desktop 登录账号与 Code 初始化账号尚未一致。请完成账号切换、打开 Code 页面后刷新列表。");
-            return new DesktopIdentity { AccountId = activeAccount, OrgId = initialized.Groups[2].Value,
-                IndexRoot = Path.Combine(root, "claude-code-sessions", activeAccount, initialized.Groups[2].Value) };
+            return null;
+        }
+
+        private string ResolveOrgFromDisk(string root, string activeAccount)
+        {
+            string accountDir = Path.Combine(root, "claude-code-sessions", activeAccount);
+            if (!Directory.Exists(accountDir)) return null;
+            var candidates = new DirectoryInfo(accountDir)
+                .EnumerateDirectories("*", SearchOption.TopDirectoryOnly)
+                .Where(dir => IsSessionId(dir.Name))
+                .Select(dir =>
+                {
+                    var indexFiles = dir.EnumerateFiles("local_*.json", SearchOption.TopDirectoryOnly).ToList();
+                    DateTime newestWrite = indexFiles.Count > 0 ? indexFiles.Max(f => f.LastWriteTimeUtc) : dir.LastWriteTimeUtc;
+                    return new { OrgId = dir.Name, HasIndexes = indexFiles.Count > 0, IndexCount = indexFiles.Count, NewestWrite = newestWrite };
+                })
+                .OrderByDescending(c => c.HasIndexes)
+                .ThenByDescending(c => c.NewestWrite)
+                .ToList();
+            if (candidates.Count == 0) return null;
+            log.Write("desktop_identity_from_disk", "account=" + activeAccount + ";org=" + candidates[0].OrgId + ";indexes=" + candidates[0].IndexCount);
+            return candidates[0].OrgId;
         }
 
         public static void EnsureIdentity(DesktopIdentity current, DesktopIdentity expected)
@@ -214,11 +294,9 @@ namespace ClaudeSessionImporter
         {
             var indexes = new Dictionary<string, DesktopIndex>(StringComparer.OrdinalIgnoreCase);
             // 新账号已初始化但尚无会话时，Desktop 会在首次原生导入后创建这一派生目录。
-            if (!Directory.Exists(directory))
+            if (String.IsNullOrWhiteSpace(directory) || !Directory.Exists(directory))
             {
-                if (!Directory.Exists(Path.GetDirectoryName(Path.GetDirectoryName(directory))))
-                    throw new IOException("Desktop 会话存储根目录不存在：" + directory);
-                log.Write("index_namespace_pending_creation", directory);
+                log.Write("index_namespace_pending_creation", directory ?? "(null)");
                 return indexes;
             }
             foreach (var file in Directory.EnumerateFiles(directory, "local_*.json", SearchOption.TopDirectoryOnly))
@@ -235,11 +313,21 @@ namespace ClaudeSessionImporter
         {
             log.Write("scan_started", settings.projectsRoot);
             string provider = CurrentProvider();
-            var active = ResolveIdentity(provider);
+            string pendingReason;
+            var active = TryResolveIdentity(provider, out pendingReason);
             OfficialIdentity = provider == "claude-desktop-official" ? active : null;
             GatewayIdentity = provider == "claude-desktop-official" ? null : active;
-            log.Write("desktop_identity_resolved", "provider=" + provider + ";account=" + active.AccountId + ";org=" + active.OrgId);
-            var indexes = ReadIndexes(active.IndexRoot);
+            Dictionary<string, DesktopIndex> indexes;
+            if (active != null)
+            {
+                log.Write("desktop_identity_resolved", "provider=" + provider + ";account=" + active.AccountId + ";org=" + active.OrgId);
+                indexes = ReadIndexes(active.IndexRoot);
+            }
+            else
+            {
+                log.Write("desktop_identity_pending", "provider=" + provider + ";reason=" + pendingReason);
+                indexes = new Dictionary<string, DesktopIndex>(StringComparer.OrdinalIgnoreCase);
+            }
             // 只枚举项目目录的顶层 JSONL，避免把子代理记录当作可独立导入的会话。
             var files = Directory.EnumerateDirectories(settings.projectsRoot)
                 .SelectMany(folder => Directory.EnumerateFiles(folder, "*.jsonl", SearchOption.TopDirectoryOnly))
@@ -470,30 +558,41 @@ namespace ClaudeSessionImporter
             foreach (var session in selected)
             {
                 if (CurrentProvider() != expectedProvider) throw new IOException("CC Switch 的 Desktop 模式已变化，请刷新列表后重新选择。");
-                var identity = ResolveIdentity(expectedProvider);
-                EnsureIdentity(identity, expectedIdentity);
-                string indexRoot = identity.IndexRoot;
-                bool alreadyRegistered = ReadIndexes(indexRoot).ContainsKey(session.Id);
+                string pendingReason;
+                var identity = TryResolveIdentity(expectedProvider, out pendingReason);
+                if (expectedIdentity != null && identity != null) EnsureIdentity(identity, expectedIdentity);
+                if (expectedIdentity == null && identity != null) expectedIdentity = identity;
+                bool alreadyRegistered = identity != null && ReadIndexes(identity.IndexRoot).ContainsKey(session.Id);
                 progress.Report((alreadyRegistered ? "正在唤醒已有会话：" : "正在导入新会话：") + session.Title + " · " + session.Id.Substring(0, 8));
                 log.Write(alreadyRegistered ? "desktop_reopen_started" : "desktop_open_started", "id=" + session.Id + ";provider=" + expectedProvider +
-                    ";account=" + identity.AccountId + ";org=" + identity.OrgId + ";indexRoot=" + indexRoot);
+                    ";account=" + (identity == null ? "pending" : identity.AccountId) + ";org=" + (identity == null ? "pending" : identity.OrgId) +
+                    ";indexRoot=" + (identity == null ? "pending" : identity.IndexRoot));
                 Process.Start(new ProcessStartInfo { FileName = ResumeUri(session.Id), UseShellExecute = true, WorkingDirectory = session.Cwd });
                 // 只发送一次原生链接；等待实际索引登记，超时明确失败，不改写 Desktop 内部数据。
                 var timer = Stopwatch.StartNew();
-                while (!ReadIndexes(indexRoot).ContainsKey(session.Id))
+                while (true)
                 {
+                    identity = TryResolveIdentity(expectedProvider, out pendingReason);
+                    if (identity != null)
+                    {
+                        if (expectedIdentity == null) expectedIdentity = identity;
+                        else EnsureIdentity(identity, expectedIdentity);
+                        if (ReadIndexes(identity.IndexRoot).ContainsKey(session.Id)) break;
+                    }
                     if (timer.Elapsed.TotalSeconds >= settings.importTimeoutSeconds)
+                    {
+                        string accountTag = identity != null ? identity.AccountId.Substring(0, 8) : "未初始化";
                         throw new TimeoutException("Desktop 未在 " + settings.importTimeoutSeconds + " 秒内登记会话 " + session.Id +
-                            "（账号 " + identity.AccountId.Substring(0, 8) + "）。请检查 Desktop 的错误提示。日志：" + settings.logPath);
+                            "（账号 " + accountTag + "）。请检查 Desktop 的错误提示。日志：" + settings.logPath);
+                    }
                     if (CurrentProvider() != expectedProvider) throw new IOException("等待登记期间 Desktop 模式发生变化，请检查当前 Desktop 配置。");
-                    EnsureIdentity(ResolveIdentity(expectedProvider), expectedIdentity);
                     progress.Report("等待 Desktop 登记：" + session.Id.Substring(0, 8) + "（" + (int)timer.Elapsed.TotalSeconds + " 秒）");
                     await Task.Delay(settings.pollIntervalMs);
                 }
                 EnsureIdentity(ResolveIdentity(expectedProvider), expectedIdentity);
-                var registered = ReadIndexes(indexRoot)[session.Id];
-                if (expectedProvider == "claude-desktop-official") session.OfficialRegistered = true;
-                else session.GatewayRegistered = true;
+                var registered = ReadIndexes(identity.IndexRoot)[session.Id];
+                if (expectedProvider == "claude-desktop-official") { OfficialIdentity = identity; session.OfficialRegistered = true; }
+                else { GatewayIdentity = identity; session.GatewayRegistered = true; }
                 log.Write(alreadyRegistered ? "desktop_reopen_finished" : "desktop_open_finished", "id=" + session.Id + ";registered=true;desktopSession=" + registered.sessionId +
                     ";account=" + identity.AccountId + ";org=" + identity.OrgId);
                 await Task.Delay(settings.pollIntervalMs);
@@ -657,7 +756,8 @@ namespace ClaudeSessionImporter
                 sessions = await Task.Run(() => catalog.Scan());
                 identity = provider == "claude-desktop-official" ? catalog.OfficialIdentity : catalog.GatewayIdentity;
                 if (catalog.CurrentProvider() != provider) throw new IOException("扫描期间 Desktop 模式已变化，请刷新列表。");
-                Catalog.EnsureIdentity(catalog.ResolveIdentity(provider), identity);
+                if (identity != null)
+                    Catalog.EnsureIdentity(catalog.ResolveIdentity(provider), identity);
                 checkedSessions.Clear();
                 var selectionTime = DateTimeOffset.UtcNow;
                 foreach (var recent in sessions.Where(session => session.ConversationAt.HasValue &&
@@ -669,7 +769,7 @@ namespace ClaudeSessionImporter
                 project.SelectedIndex = selected >= 0 ? selected : 0;
                 mode.Text = (provider == "claude-desktop-official" ? "官方订阅" : "API / Gateway") + " · 当前 " +
                     (currentAccount == null ? "未匹配保存的账号（建议先保存）" : currentAccount.BaseDisplay) +
-                    " · 默认勾选最近 " + settings.activeSessionHours + " 小时对话";
+                    (identity == null ? " · 待首次打开会话初始化索引" : " · 默认勾选最近 " + settings.activeSessionHours + " 小时对话");
             }
             catch (Exception ex) { sessions.Clear(); checkedSessions.Clear(); grid.Rows.Clear(); Failure(ex); return; }
             finally { SetBusy(false); }

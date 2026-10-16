@@ -82,27 +82,21 @@ namespace ClaudeSessionImporter
             if (!before.accounts.Any(account => account.name == target.name && account.health == "usable")) throw new IOException("目标账号状态已变化，请刷新列表。");
             log.Write("switch_continue_started", "sessions=" + selected.Count);
             await Run(new[] { "use", "--", target.name }, progress);
-            var timer = Stopwatch.StartNew(); DesktopIdentity identity = null; IOException initializationError = null;
-            while (timer.Elapsed.TotalSeconds < settings.importTimeoutSeconds)
+            var timer = Stopwatch.StartNew(); DesktopIdentity identity = null; string pendingReason = null;
+            while (timer.Elapsed.TotalSeconds < Math.Min(3, settings.importTimeoutSeconds))
             {
                 if (catalog.CurrentProvider() != "claude-desktop-official") throw new IOException("切换期间 Desktop 模式变化，未发送会话导入链接。");
                 var state = await ReadAccounts();
                 if (state.current != target.name) throw new IOException("Desktop 恢复后的账号不等于所选账号，未发送会话导入链接。");
-                try { identity = catalog.ResolveIdentity("claude-desktop-official"); }
-                catch (IOException ex)
-                {
-                    initializationError = ex; log.Write("desktop_initialization_pending", ex.Message);
-                }
-                if (identity == null)
-                {
-                    progress.Report("账号已恢复，等待 Code 初始化（" + (int)timer.Elapsed.TotalSeconds + " 秒）…");
-                    await Task.Delay(settings.pollIntervalMs); continue;
-                }
-                break;
+                identity = catalog.TryResolveIdentity("claude-desktop-official", out pendingReason);
+                if (identity != null) break;
+                log.Write("desktop_initialization_pending", pendingReason ?? "pending");
+                progress.Report("账号已恢复，正在准备唤醒 Code 会话（" + (int)timer.Elapsed.TotalSeconds + " 秒）…");
+                await Task.Delay(settings.pollIntervalMs);
             }
-            if (identity == null) throw new TimeoutException("账号已切换，但 Code 初始化未完成。请打开 Code 页面后刷新并导入。", initializationError);
             await catalog.OpenSelected(selected, "claude-desktop-official", identity, progress);
-            log.Write("switch_continue_finished", "sessions=" + selected.Count + ";account=" + identity.AccountId);
+            var finalIdentity = catalog.OfficialIdentity ?? identity;
+            log.Write("switch_continue_finished", "sessions=" + selected.Count + ";account=" + (finalIdentity == null ? target.name : finalIdentity.AccountId));
         }
         public async Task<string> Run(string[] arguments, IProgress<string> progress)
         {
